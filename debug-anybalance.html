@@ -1,0 +1,27 @@
+﻿<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/jquery.min.js"></script>
+  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/api-adapter.js"></script>
+  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/api.js"></script>
+  <script>
+        var g_api_preferences = {
+          //Please insert preferences required for your provider
+          //These should be the values described in preference.xml of your provider
+          //For example:
+          //  login: 'username',
+          //  password: 'secretpass'
+        };
+  </script>
+  <!-- List all the scripts that are needed by your provider according to its manifest.
+       Use local file system paths. JQuery library is already included.
+       For example, -->
+  <script src="library.js"></script>
+  <script src="main.js"></script>
+</head>
+<body onload="">
+  <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>
+  <button onclick="api_onload()">Execute</button>
+  <div id="AnyBalanceDebuggerLog"></div>
+</body>
+</html>
