@@ -73,16 +73,16 @@ function abd_checkIsBackgroundInitialized() {
 }
 
 function loadExtensionScript(scriptPath, onload, onerror) {
-    var script = document.createElement('script');
-    script.type = 'text/javascript';
-    if (onload)
-        script.onload = onload;
-    if (onerror)
-        script.onerror = onerror;
-//  script.src = (/:\/\//.test(scriptPath) ? '' : getScriptBaseURL()) + scriptPath;
-    script.src = (/:\/\/|^\/|\.\./.test(scriptPath) ? '' : getScriptBaseURL()) + scriptPath;
-
-    $("body").append(script);
+    var url = (/:\/\/|^\/|\.\./.test(scriptPath) ? '' : getScriptBaseURL()) + scriptPath;
+    $.getScript( url )
+        .done(function( script, textStatus ) {
+            if(onload)
+                onload();
+        })
+        .fail(function( jqxhr, settings, exception ) {
+            if(onerror)
+                onerror();
+        });
 }
 
 function abd_onLoadDocument() {
@@ -116,8 +116,32 @@ window.addEventListener("message", function(event) {
 
     if (event.data.type && (event.data.type == "LOAD_PROVIDER_SCRIPTS")) {
         jQuery.ajaxSetup({cache:true}); //Не добавлять метку времени к скриптам
+        var scriptsStatus = [];
+        function callEverythingIsLoaded(){
+            if(scriptsStatus.length != event.data.scripts.length)
+                return;
+
+            var failed = [];
+            for(var i=0; i<scriptsStatus.length; ++i){
+                if(typeof scriptsStatus[i] == 'undefined')
+                    return; //Часть ещё загружается
+                if(!scriptsStatus[i])
+                    failed.push(event.data.scripts[i].replace(/.*\/([^\/]+)/, '$1'));
+            }
+
+            window.postMessage({type: "LOADED_PROVIDER_SCRIPTS", result: failed.length==0, failed: failed}, "*");
+        }
+
         for(var i=0; i<event.data.scripts.length; ++i){
-            loadExtensionScript(event.data.scripts[i]);
+            (function(i){
+                loadExtensionScript(event.data.scripts[i], function(){
+                    scriptsStatus[i] = true;
+                    callEverythingIsLoaded();
+                }, function(){
+                    scriptsStatus[i] = false;
+                    callEverythingIsLoaded();
+                });
+            })(i);
         }
     }
 }, false);
