@@ -1,9 +1,6 @@
 ﻿<html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/jquery.min.js"></script>
-  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/api-adapter.js"></script>
-  <script src="chrome-extension://bjhpeieonkhafpmpkjolifioeodfoiag/api.js"></script>
   <script>
         var g_api_preferences = {
           //Please insert preferences required for your provider
@@ -13,11 +10,13 @@
           //  password: 'secretpass'
         };
   </script>
-  <!-- List all the scripts that are needed by your provider according to its manifest.
+  <!-- If you have local Fenix server (http://fenixwebserver.com/) installed and running you DO NOT need to list providers scripts here.
+       If you prefer old style debugging and don't use provider dependancies, list scripts here
        Use local file system paths. JQuery library is already included.
-       For example, -->
-  <script src="library.js"></script>
-  <script src="main.js"></script>
+       For example,
+		  <script src="library.js"></script>
+		  <script src="main.js"></script>
+   -->
 </head>
 <body onload="">
   <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>

@@ -7,6 +7,7 @@ var AnyBalanceDebuggerApi;
          'repos-prefer-source': false, //Подтягивать исходники модулей вместе самой новой скомпилированной версии
          'repos': {}, //Настроенные репозитории
          'abd-replace-3xx': false, //Обход бага хрома с редиректом на другие домены/протоколы (нужен Fiddler)
+         'clear-cookies': false //Стирать куки перед стартом провайдера
          */
     };
 
@@ -173,10 +174,11 @@ var AnyBalanceDebuggerApi;
                 if (new Date().getTime() - start >= milliseconds)
                     break;
                 sleep(500);
-            } while (!(result = callBackground({method: 'getOpResult'})));
-            if (!result)
+                result = callBackground({method: 'getOpResult'});
+            } while (!isset(result));
+            if (!isset(result))
                 m_lastError = "Timeout " + milliseconds + "ms has been exeeded waiting for result";
-            if (result.error)
+            else if (result.error)
                 m_lastError = result.error;
             return result && result.result;
         }
@@ -398,9 +400,20 @@ var AnyBalanceDebuggerApi;
 
             initializeBackground: function () {
                 m_backgroundInitialized = false;
-                chrome.extension.sendMessage({method: "initialize"}, function (response) {
+                chrome.extension.sendMessage({method: "initialize", params: [g_global_config]}, function (response) {
                     m_backgroundInitialized = response.result;
                     console.log("Background is initialized: " + m_backgroundInitialized);
+
+                    if(g_global_config['clear-cookies']){
+                        if(chrome.extension.inIncognitoContext) {
+                            api_trace('Clearing all cookies before executing provider...');
+                            callBackground({method: 'clearAllCookies'});
+                            var cookiesCleared = wait4Result();
+                            api_trace(cookiesCleared + ' cookies cleared!');
+                        }else{
+                            api_trace('Cookies have not been cleared because it can be done in incognito mode only!');
+                        }
+                    }
                 });
             },
 
@@ -526,35 +539,53 @@ var AnyBalanceDebuggerApi;
 </div>`;
 
     function onLoadContentDocument() {
-        $('body').append($(tabs));
+        var $div = $('<div id="initialContent"/>');
+        var $body = $('body');
+        $body.children().appendTo($div);
+        $div.appendTo($body);
+
+        $body.append($(tabs));
         $('#initialContent').appendTo('#tabs-1');
 
-        var explanation = `This is a workaround for chrome bug that cause syncronous
-            request to fail when it is redirected to different domain or protocol.
-            The workaround requires that you use Fiddler and add a special extension to it!
+        var $button = $('button').first();
+        $button.prop('disabled', true).attr('id', 'buttonExecute');
 
-            Download the extension from http://anybalance.ru/download/AnyBalanceFiddlerExtension.dll
-            and place it into "%userprofile%\Documents\Fiddler2\Scripts"`;
-
-        $('button').first().after('<input type="checkbox" id="abd-replace-3xx" name="abd-replace-3xx" value="1"><label for="abd-replace-3xx"><acronym title="' + explanation + '">Enable 3xx replace</acronym></label>');
-
-        chrome.storage.local.get(['abd-replace-3xx', 'repos', 'repos-prefer-source'], function (items) {
+        chrome.storage.local.get(['abd-replace-3xx', 'repos', 'repos-prefer-source', 'clear-cookies'], function (items) {
             for (var prop in items)
                 g_global_config[prop] = items[prop];
-
             configureByPreferences();
             setupPreferencesRepos();
         });
 
-        $('#abd-replace-3xx').on('click', function () {
-            g_global_config['abd-replace-3xx'] = $('#abd-replace-3xx').prop('checked');
-            chrome.storage.local.set({'abd-replace-3xx': g_global_config['abd-replace-3xx']});
-        });
-
         $("#tabs").tabs();
+
+        $LAB.setOptions({AlwaysPreserveOrder: true})
+            .script(chrome.extension.getURL('jquery-ui/jquery.min.js'))
+            .script(chrome.extension.getURL('json-viewer/jquery.json-viewer.js'))
+            .script(chrome.extension.getURL('api-adapter.js'))
+            .script(chrome.extension.getURL('api.js'))
+            .wait(function () {
+                window.postMessage({type: "INITIALIZE_PAGE_SCRIPT"}, "*");
+            });
     }
 
     var prefsTab = `
+<h3>Network error bug workaround</h3>
+<input type="checkbox" id="abd-replace-3xx" name="abd-replace-3xx" value="1"><label for="abd-replace-3xx">Enable 3xx replace</label><br/>
+<small>
+    This is a workaround for chrome bug that causes synchronous
+    request to fail when it is redirected to different domain or protocol.
+    The workaround requires that you use <a href="http://www.telerik.com/fiddler">Fiddler</a> and add a special extension to it!<br/>
+    Download the extension from <a href="http://anybalance.ru/download/AnyBalanceFiddlerExtension.dll"><code>http://anybalance.ru/download/AnyBalanceFiddlerExtension.dll</code></a>
+    and place it into <code>"%userprofile%\\Documents\\Fiddler2\\Scripts"</code>
+</small>
+<hr/>
+<h3>Cookie persistence</h3>
+<input type="checkbox" id="clear-cookies" name="clear-cookies" value="1"><label for="clear-cookies">Clear all cookies before executing providers</label><br/>
+<small>
+    To prevent your beloved cookies from unwanted death this option can be enabled <b>in incognito mode only</b>!
+</small>
+<hr/>
 <h3>Paths to local module repositories</h3>
 <button id="btnAdd">Add Modules Path</button>
 <br><br>
@@ -572,8 +603,6 @@ var AnyBalanceDebuggerApi;
         </tr>
     </tbody></table>
 </div>
-<br>
-<button id="btnSave">Save changes</button>
 <hr/>
 <input type="checkbox" name="repos-prefer-source" id="repos-prefer-source">
 <label for="repos-prefer-source">Prefer "source" version over "head"</label>
@@ -590,6 +619,19 @@ var AnyBalanceDebuggerApi;
             .on('click', function () {
                 g_global_config['repos-prefer-source'] = $('#repos-prefer-source').prop('checked');
                 chrome.storage.local.set({'repos-prefer-source': g_global_config['repos-prefer-source']});
+            });
+        $('#abd-replace-3xx')
+            .prop('checked', !!g_global_config['abd-replace-3xx'])
+            .on('click', function () {
+                g_global_config['abd-replace-3xx'] = $('#abd-replace-3xx').prop('checked');
+                chrome.storage.local.set({'abd-replace-3xx': g_global_config['abd-replace-3xx']});
+            });
+        $('#clear-cookies')
+            .prop('checked', !!g_global_config['clear-cookies'])
+            .prop('disabled', !chrome.extension.inIncognitoContext)
+            .on('click', function () {
+                g_global_config['clear-cookies'] = $('#clear-cookies').prop('checked');
+                chrome.storage.local.set({'clear-cookies': g_global_config['clear-cookies']});
             });
     }
 
@@ -622,16 +664,6 @@ var AnyBalanceDebuggerApi;
             data.push(d);
         }
 
-        function setChanged(changed) {
-            if (changed) {
-                $("#btnSave").prop('disabled', false).css('color', 'orange');
-            } else {
-                $("#btnSave").prop('disabled', true).css('color', 'gray');
-            }
-        }
-
-        setChanged(false);
-
         dialog = $("#dialog").dialog({
             title: "Add/Edit Record",
             autoOpen: false,
@@ -655,7 +687,7 @@ var AnyBalanceDebuggerApi;
         function Delete(e) {
             if (confirm("Are you sure you want to delete repo " + e.data.record.Name + '?')) {
                 grid.removeRow(e.data.id);
-                setChanged(true);
+                saveRepos();
             }
         }
 
@@ -674,7 +706,7 @@ var AnyBalanceDebuggerApi;
                 }
                 grid.addRow({"ID": grid.count() + 1, "Name": $("#Name").val(), "Path": $("#Path").val()});
             }
-            setChanged(true);
+            saveRepos();
             $(this).dialog("close");
         }
 
@@ -702,19 +734,17 @@ var AnyBalanceDebuggerApi;
             $("#dialog").dialog("open");
         });
 
-        $("#btnSave").on("click", function () {
+        function saveRepos(){
             var repos = {};
             var all = grid.getAll();
             for (var i = 0; i < all.length; ++i) {
                 var r = {path: all[i].record.Path};
                 repos[all[i].record.Name] = r;
             }
-            $("#btnSave").css('color', 'black');
             chrome.storage.local.set({'repos': repos}, function () {
                 g_global_config.repos = repos;
-                setChanged(false);
             });
-        });
+        };
     }
 
     var animation = `
@@ -745,16 +775,23 @@ Prepairing provider files...
             .done(function (data, textStatus, jqXHR) {
                 configureRepoServers(prefs, data, function (ok, failedList) {
                     if (ok) {
-                        var files = loadProviderFiles(function (ok, error) {
-                            console.log('Files list loaded: ' + ok + ': ' + error);
-                            $('#loading_text').text('Loading provider scripts...');
+                        var files = loadProviderFiles(function (ok, failedList) {
+                            if(!ok){
+                                AnyBalanceDebuggerApi.trace("WARNING: Some dependencies were not loaded (" + failedList.join(', ') + "). Check network tab for details.");
+                            }
+                            $('#buttonExecute').prop('disabled', false);
+                            $('#loading_status').hide();
                         });
                     } else {
-                        $('#loading_status').html('ERROR: The following repositories failed: ' + failedList.join(', '));
+                        var failedRepos = [];
+                        for(var i=0; i<failedList.length; ++i){
+                            failedRepos.push(failedList[i] + ': ' + g_repoServers[failedList[i]].statusMessage);
+                        }
+                        $('#loading_status').html('ERROR: The following repositories failed:<br>&nbsp;&nbsp;&nbsp;&nbsp;' + failedRepos.join('<br>&nbsp;&nbsp;&nbsp;&nbsp;'));
                     }
                 });
             }).fail(function (jqXHR, textStatus, errorThrown) {
-                $('#loading_status').html('Fenix server is unavailable. Run it or use local debugging.');
+                $('#loading_status').html('<a href="http://fenixwebserver.com" target=_blank>Fenix server</a> is unavailable. Run it or use local debugging.');
                 console.log('error: ' + textStatus);
             });
     }
@@ -774,6 +811,13 @@ Prepairing provider files...
     function createAndStartServer(repo, onComplete, allServers) {
         allServers = allServers || g_repoServers;
         var r = allServers[repo];
+        if (!r.path) {
+            r.status = false;
+            r.statusMessage = 'Please configure repository local path!';
+            callFinalComplete(onComplete, allServers);
+            return;
+        }
+
         $.ajax('http://localhost:33649/server', {
             method: "POST",
             data: JSON.stringify({
@@ -786,12 +830,17 @@ Prepairing provider files...
             }
         })
             .done(function (data) {
-                r.port = data.port;
-                r.id = data.id;
-                if (data.running)
-                    r.status = true;
-                else
-                    startServer(repo, onComplete, allServers);
+                if(typeof data == 'string'){
+                    r.status = false;
+                    r.statusMessage = 'Can not create server: ' + data;
+                }else {
+                    r.port = data.port;
+                    r.id = data.id;
+                    if (data.running)
+                        r.status = true;
+                    else
+                        startServer(repo, onComplete, allServers);
+                }
                 callFinalComplete(onComplete, allServers);
             }).fail(function (xhr) {
                 r.status = false;
@@ -897,18 +946,24 @@ Prepairing provider files...
         if (!repo)
             repo = '__self';
         var r = g_repoServers[repo];
-        return 'http://localhost:' + r.port + '/' + (r.addPath || '') + path;
+        if(r)
+            return 'http://localhost:' + r.port + '/' + (r.addPath || '') + path;
     }
 
     function loadFileFromRepository(repo, path, onComplete) {
-        return $.ajax(getRepoFileUrl(repo, path))
-            .done(function (data) {
-                if (onComplete)
-                    onComplete(true, data);
-            }).fail(function (xhr) {
-                if (onComplete)
-                    onComplete(false, xhr.status + ' ' + xhr.statusText);
-            });
+        var url = getRepoFileUrl(repo, path);
+        if(url) {
+            $.ajax(url)
+                .done(function (data) {
+                    if (onComplete)
+                        onComplete(true, data);
+                }).fail(function (xhr) {
+                    if (onComplete)
+                        onComplete(false, xhr.status + ' ' + xhr.statusText);
+                });
+        }else{
+            onComplete(false, "Repository '" + repo + "' is not configured!");
+        }
     }
 
     function gatherModules(module, data, onComplete) {
@@ -948,7 +1003,7 @@ Prepairing provider files...
                 (function (module) {
                     loadFileFromRepository(module.repo, getModuleFilePath(module, 'anybalance-manifest.xml'), function (ok, data) {
                         if (!ok) {
-                            AnyBalanceDebuggerApi.trace("ERROR: Module " + module.repo + ':' + module.id + '(' + module.version + ') can not be loaded!');
+                            AnyBalanceDebuggerApi.trace("ERROR: Module " + module.repo + ':' + module.id + '(' + module.version + ') can not be loaded: ' + data);
                             module.status = false;
                             module.statusMessage = data;
                             return callFinalComplete(onComplete, g_modules);
@@ -1009,9 +1064,23 @@ Prepairing provider files...
                 var scripts = [];
                 loadModule(module, scripts);
 
-                console.log(scripts);
-                window.postMessage({type: "LOAD_PROVIDER_SCRIPTS", scripts: scripts}, "*");
-                onComplete(true);
+                //console.log(scripts);
+
+                $('#loading_text').text('Loading provider scripts...');
+                var failedScripts = [];
+                var scriptErrorsHandled = {};
+                $LAB.setOptions({
+                    AlwaysPreserveOrder: true,
+                    LoadErrorHandler: function (script, event) {
+                        // handle error however you wish for example:
+                        if(scriptErrorsHandled[script])
+                            return;
+                        failedScripts.push(script.replace(/.*\/([^\/]+)$/, '$1'));
+                        scriptErrorsHandled[script] = true;
+                    }
+                }).script(scripts).wait(function () {
+                    onComplete(failedScripts.length == 0, failedScripts);
+                });
             });
         });
 
@@ -1023,13 +1092,10 @@ Prepairing provider files...
         if (event.source != window)
             return;
 
-        if (event.data.type && (event.data.type == "LOADED_PROVIDER_SCRIPTS")) {
-            $('#loading_status').hide();
-            if(!event.data.result)
-                AnyBalanceDebuggerApi.trace("WARNING: Some dependencies were not loaded (" + event.data.failed.join(', ') + "). Check network tab for details.");
+        if (event.data.type && (event.data.type == "SCRIPT_ERROR_DETECTED")) {
+            AnyBalanceDebuggerApi.trace("WARNING: " + event.data.errorMsg + " at " + event.data.url + ':' + event.data.lineNumber + ". Check console for details.");
         }
     });
-
 
     onLoadContentDocument();
 })();

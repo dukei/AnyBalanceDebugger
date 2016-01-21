@@ -1,40 +1,75 @@
 {
   "name": "AnyBalance Debugger",
   "manifest_version": 2,
-  "version": "3.9.0",
+  "version": "3.9.1",
   "description": "Provides support for AnyBalance provider debugging",
-  "permissions": ["webRequest", "webRequestBlocking", "cookies",
-    "http://*/*", "https://*/*", "storage"
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "cookies",
+    "http://*/*",
+    "https://*/*",
+    "storage"
   ],
-  "content_scripts": [{
-      "matches": ["file://*/*-anybalance.html", "http://*/*-anybalance.html", "https://*/*-anybalance.html"],
-      "js": ["jquery.min.js", "jquery-ui/jquery-ui.min.js", "core-min.js", "enc-base64-min.js", "base64arr.js",
-		"sh/scripts/shCore.js", "sh/scripts/shBrushCss.js", "sh/scripts/shBrushJScript.js", "sh/scripts/shBrushPlain.js", "sh/scripts/shBrushXml.js",
-		"json-viewer/jquery.json-viewer.js", "grid/grid-0.5.6.min.js", "common.js", "api-implementation.js"],
-      "css": ["styles.css", "sh/styles/shCore.css", "sh/styles/shCoreDefault.css", "sh/styles/shThemeDefault.css", "json-viewer/jquery.json-viewer.css", "jquery-ui/jquery-ui.min.css", "grid/grid-0.5.6.min.css"]
-  }],
+  "content_scripts": [
+    {
+      "matches": [
+        "file://*/*-anybalance.html",
+        "http://*/*-anybalance.html",
+        "https://*/*-anybalance.html"
+      ],
+      "js": [
+        "jquery-ui/jquery.min.js",
+        "jquery-ui/jquery-ui.min.js",
+        "core-min.js",
+        "enc-base64-min.js",
+        "base64arr.js",
+        "sh/scripts/shCore.js",
+        "sh/scripts/shBrushCss.js",
+        "sh/scripts/shBrushJScript.js",
+        "sh/scripts/shBrushPlain.js",
+        "sh/scripts/shBrushXml.js",
+        "json-viewer/jquery.json-viewer.js",
+        "grid/grid-0.5.6.min.js",
+        "lab.src.js",
+        "common.js",
+        "api-implementation.js"
+      ],
+      "css": [
+        "styles.css",
+        "sh/styles/shCore.css",
+        "sh/styles/shCoreDefault.css",
+        "sh/styles/shThemeDefault.css",
+        "json-viewer/jquery.json-viewer.css",
+        "jquery-ui/jquery-ui.min.css",
+        "grid/grid-0.5.6.min.css"
+      ]
+    }
+  ],
   "background": {
-    "scripts": ["common.js", "background.js"]
+    "scripts": [
+      "common.js",
+      "background.js"
+    ]
   },
   "web_accessible_resources": [
-      "api.js",
-      "api-adapter.js",
-      "jquery.min.js",
-      "json-viewer/jquery.json-viewer.js",
-      "depends.js",
-      "jquery-ui/images/ui-bg_diagonals-thick_18_b81900_40x40.png",
-      "jquery-ui/images/ui-bg_diagonals-thick_20_666666_40x40.png",
-      "jquery-ui/images/ui-bg_flat_10_000000_40x100.png",
-      "jquery-ui/images/ui-bg_glass_100_f6f6f6_1x400.png",
-      "jquery-ui/images/ui-bg_glass_100_fdf5ce_1x400.png",
-      "jquery-ui/images/ui-bg_glass_65_ffffff_1x400.png",
-      "jquery-ui/images/ui-bg_gloss-wave_35_f6a828_500x100.png",
-      "jquery-ui/images/ui-bg_highlight-soft_100_eeeeee_1x100.png",
-      "jquery-ui/images/ui-bg_highlight-soft_75_ffe45c_1x100.png",
-      "jquery-ui/images/ui-icons_222222_256x240.png",
-      "jquery-ui/images/ui-icons_228ef1_256x240.png",
-      "jquery-ui/images/ui-icons_ef8c08_256x240.png",
-      "jquery-ui/images/ui-icons_ffd27a_256x240.png",
-      "jquery-ui/images/ui-icons_ffffff_256x240.png"
+    "api.js",
+    "api-adapter.js",
+    "jquery-ui/jquery.min.js",
+    "json-viewer/jquery.json-viewer.js",
+    "jquery-ui/images/ui-bg_diagonals-thick_18_b81900_40x40.png",
+    "jquery-ui/images/ui-bg_diagonals-thick_20_666666_40x40.png",
+    "jquery-ui/images/ui-bg_flat_10_000000_40x100.png",
+    "jquery-ui/images/ui-bg_glass_100_f6f6f6_1x400.png",
+    "jquery-ui/images/ui-bg_glass_100_fdf5ce_1x400.png",
+    "jquery-ui/images/ui-bg_glass_65_ffffff_1x400.png",
+    "jquery-ui/images/ui-bg_gloss-wave_35_f6a828_500x100.png",
+    "jquery-ui/images/ui-bg_highlight-soft_100_eeeeee_1x100.png",
+    "jquery-ui/images/ui-bg_highlight-soft_75_ffe45c_1x100.png",
+    "jquery-ui/images/ui-icons_222222_256x240.png",
+    "jquery-ui/images/ui-icons_228ef1_256x240.png",
+    "jquery-ui/images/ui-icons_ef8c08_256x240.png",
+    "jquery-ui/images/ui-icons_ffd27a_256x240.png",
+    "jquery-ui/images/ui-icons_ffffff_256x240.png"
   ]
 }

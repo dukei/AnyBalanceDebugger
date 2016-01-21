@@ -6,6 +6,8 @@ body {
 #AnyBalanceDebuggerLog {
     margin-top: 15px;
     border-top: 1px black solid;
+    background-color: white;
+    padding: 5px;
 }
 
 .expandable {

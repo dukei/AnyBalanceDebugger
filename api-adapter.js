@@ -30,7 +30,7 @@ var g_AnyBalanceApiParams = {
         html_output('setResult called: <pre id="json-viewer-' + ts + '" style="margin-left:10px"></pre>');
         $('#json-viewer-' + ts).jsonViewer(JSON.parse(data));
         return true;
-    },
+    }
 };
 
 function abd_callContentFunc__(strcall) {
@@ -56,92 +56,50 @@ function abd_callContentFunc(rpccall) {
     return JSON.parse(strjson).result;
 }
 
+function abd_executeProvider(){
+    //вызывается из контент скрипта
+    var now = new Date();
+    html_output('<font color="#888">Provider started at ' + now + '</font>');
+
+    api_onload();
+
+    var now1 = new Date();
+    html_output('<font color="#888">Provider finished at ' + now1 + ', running ' + (now1.getTime() - now.getTime()) / 1000 + ' seconds</font><hr/>');
+
+}
+
 function abd_checkIsBackgroundInitialized() {
     if (abd_callContentFunc({method: 'isBackgroundInitialized'})) {
         //Бэкграунд инициализирован, можно загружать провайдер
-
-        var now = new Date();
-        html_output('<font color="#888">Provider started at ' + now + '</font>');
-
-        api_onload();
-
-        var now1 = new Date();
-        html_output('<font color="#888">Provider finished at ' + now1 + ', running ' + (now1.getTime() - now.getTime()) / 1000 + ' seconds</font><hr/>');
+        abd_executeProvider();
     } else {
         window.setTimeout(abd_checkIsBackgroundInitialized, 100);
     }
-}
-
-function loadExtensionScript(scriptPath, onload, onerror) {
-    var url = (/:\/\/|^\/|\.\./.test(scriptPath) ? '' : getScriptBaseURL()) + scriptPath;
-    $.getScript( url )
-        .done(function( script, textStatus ) {
-            if(onload)
-                onload();
-        })
-        .fail(function( jqxhr, settings, exception ) {
-            if(onerror)
-                onerror();
-        });
 }
 
 function abd_onLoadDocument() {
     //Присвоим в параметры апи его настройки
     g_AnyBalanceApiParams.preferences = g_api_preferences;
 
-    var $div = $('<div id="initialContent"/>');
-    $('body').children().appendTo($div);
-    $div.appendTo('body');
-
-    //Тут надо затереть прописанный в html хэндлер, так что делаем именно так
+    //ВНИМАНИЕ!!! Тут надо затереть прописанный в html хэндлер, так что делаем именно так
     $('button')[0].onclick = function () {
         abd_callContentFunc({method: 'initializeBackground'});
         window.setTimeout(abd_checkIsBackgroundInitialized, 100);
     };
 
-    loadExtensionScript('json-viewer/jquery.json-viewer.js');
 }
 
-function getScriptBaseURL() {
-    var scripts = document.getElementsByTagName('script');
-    var myScript = scripts[0];
-    return myScript.src.replace(/[^\/]*$/, '');
-}
+window.onerror = function(errorMsg, url, lineNumber){
+    window.postMessage({type: "SCRIPT_ERROR_DETECTED", errorMsg: errorMsg, url: url, lineNumber: lineNumber}, "*");
+};
 
-window.addEventListener('DOMContentLoaded', abd_onLoadDocument, false);
 window.addEventListener("message", function(event) {
     // We only accept messages from ourselves
     if (event.source != window)
         return;
 
-    if (event.data.type && (event.data.type == "LOAD_PROVIDER_SCRIPTS")) {
-        jQuery.ajaxSetup({cache:true}); //Не добавлять метку времени к скриптам
-        var scriptsStatus = [];
-        function callEverythingIsLoaded(){
-            if(scriptsStatus.length != event.data.scripts.length)
-                return;
-
-            var failed = [];
-            for(var i=0; i<scriptsStatus.length; ++i){
-                if(typeof scriptsStatus[i] == 'undefined')
-                    return; //Часть ещё загружается
-                if(!scriptsStatus[i])
-                    failed.push(event.data.scripts[i].replace(/.*\/([^\/]+)/, '$1'));
-            }
-
-            window.postMessage({type: "LOADED_PROVIDER_SCRIPTS", result: failed.length==0, failed: failed}, "*");
-        }
-
-        for(var i=0; i<event.data.scripts.length; ++i){
-            (function(i){
-                loadExtensionScript(event.data.scripts[i], function(){
-                    scriptsStatus[i] = true;
-                    callEverythingIsLoaded();
-                }, function(){
-                    scriptsStatus[i] = false;
-                    callEverythingIsLoaded();
-                });
-            })(i);
-        }
+    if (event.data.type && (event.data.type == "INITIALIZE_PAGE_SCRIPT")) {
+        console.log('Initializing page...');
+        abd_onLoadDocument();
     }
 }, false);
