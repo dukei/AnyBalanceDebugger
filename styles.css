@@ -122,3 +122,13 @@ body {
     margin-right: 5px;
     float: left;
 }
+
+#abdVersion{
+    float: right;
+    color: gray;
+}
+
+#abdHelp{
+    float: right;
+    margin-left: 10px;
+}

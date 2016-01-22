@@ -3,12 +3,19 @@ var AnyBalanceDebuggerApi;
 
 (function () {
     var g_global_config = {
-        /*
-         'repos-prefer-source': false, //Подтягивать исходники модулей вместе самой новой скомпилированной версии
-         'repos': {}, //Настроенные репозитории
-         'abd-replace-3xx': false, //Обход бага хрома с редиректом на другие домены/протоколы (нужен Fiddler)
-         'clear-cookies': false //Стирать куки перед стартом провайдера
-         */
+        //Умолчательные значения делаем здесь
+
+        //Подтягивать исходники модулей вместе самой новой скомпилированной версии
+        'repos-prefer-source': false,
+
+        //Настроенные репозитории
+        repos: {'default': {path: ''}},
+
+        //Стирать куки перед стартом провайдера
+        'clear-cookies': true,
+
+        //Обход бага хрома с редиректом на другие домены/протоколы (нужен Fiddler)
+        'abd-replace-3xx': false
     };
 
     $.fn.HasVerticalScrollBar = function () {
@@ -545,18 +552,21 @@ var AnyBalanceDebuggerApi;
         $div.appendTo($body);
 
         $body.append($(tabs));
-        $('#initialContent').appendTo('#tabs-1');
+        var $initialContent = $('#initialContent');
+        $initialContent.prepend('<div id="abdVersion">AnyBalance Debugger v.' + chrome.runtime.getManifest().version + '</div>');
+        $initialContent.prepend('<div id="abdHelp"><a target="_blank" href="https://github.com/dukei/any-balance-providers/wiki/AnyBalanceDebugger">Help</a></div>');
+        $initialContent.appendTo('#tabs-1');
 
         var $button = $('button').first();
         $button.prop('disabled', true).attr('id', 'buttonExecute');
 
-        chrome.storage.local.get(['abd-replace-3xx', 'repos', 'repos-prefer-source', 'clear-cookies'], function (items) {
-            //Умолчательные значения делаем здесь
-            if (!items.repos)
-                items.repos = {'default': {path: ''}};
-
+        var props = [];
+        for(var prop in g_global_config){ props.push(prop) }
+        chrome.storage.local.get(props, function (items) {
+            //Перезатрем умолчательные значения полученными
             for (var prop in items)
                 g_global_config[prop] = items[prop];
+
             configureByPreferences();
             setupPreferencesRepos();
         });
@@ -591,7 +601,7 @@ var AnyBalanceDebuggerApi;
 </small>
 <hr/>
 <h3>Paths to local module repositories</h3>
-<button id="btnAdd">Add Modules Path</button>
+<button id="btnAdd">Add Modules Path</button> or edit configured paths by clicking pencil icon
 <br><br>
 <table id="grid"></table>
 <div id="dialog" style="display:none">
@@ -609,7 +619,8 @@ var AnyBalanceDebuggerApi;
 </div>
 <hr/>
 <input type="checkbox" name="repos-prefer-source" id="repos-prefer-source">
-<label for="repos-prefer-source">Prefer "source" version over "head"</label>
+<label for="repos-prefer-source">Prefer "source" version over "build/head"</label><br>
+<small>Check this option if you need to debug modules sources</small>
 `;
 
     function setupPreferencesRepos() {
@@ -693,19 +704,26 @@ var AnyBalanceDebuggerApi;
         }
 
         function Save() {
-            if ($("#ID").val()) {
-                var id = parseInt($("#ID").val());
-                if (findByName($("#Name").val()) != id) {
-                    alert('Repo ' + $("#Name").val() + ' is already defined!');
+            var idstr = $("#ID").val();
+            var name = $("#Name").val(), path = $("#Path").val();
+            if(/["\s]/.test(path)) {
+                alert('Path to module repository can not contain quotes (") or spaces. Please specify another path.');
+                return;
+            }
+
+            if (idstr) {
+                var id = parseInt(idstr);
+                if (findByName(name) != id) {
+                    alert('Repo ' + name + ' is already defined!');
                     return;
                 }
-                grid.updateRow(id, {"ID": id, "Name": $("#Name").val(), "Path": $("#Path").val()});
+                grid.updateRow(id, {"ID": id, "Name": name, "Path": path});
             } else {
-                if (findByName($("#Name").val())) {
-                    alert('Repo ' + $("#Name").val() + ' is already defined!');
+                if (findByName(name)) {
+                    alert('Repo ' + name + ' is already defined!');
                     return;
                 }
-                grid.addRow({"ID": grid.count() + 1, "Name": $("#Name").val(), "Path": $("#Path").val()});
+                grid.addRow({"ID": grid.count() + 1, "Name": name, "Path": path});
             }
             saveRepos();
             $(this).dialog("close");
@@ -794,7 +812,7 @@ Prepairing provider files...
             }).fail(function (jqXHR, textStatus, errorThrown) {
                 $('#loading_status').html('<a href="http://fenixwebserver.com" target=_blank>Fenix server</a> is unavailable. Run it or use local debugging.');
                 $('#buttonExecute').prop('disabled', false);
-                console.log('Fenix status cannot be fetched: ' + textStatus + ', ' + errorThrown);
+                console.log('Fenix status can not be fetched: ' + textStatus + ', ' + errorThrown);
             });
     }
 
@@ -815,7 +833,7 @@ Prepairing provider files...
         var r = allServers[repo];
         if (!r.path) {
             r.status = false;
-            r.statusMessage = 'Please configure repository local path!';
+            r.statusMessage = 'Please configure module repository local paths (see Properties tab)!';
             callFinalComplete(onComplete, allServers);
             return;
         }
@@ -870,7 +888,20 @@ Prepairing provider files...
 
     function configureRepoServers(prefs, curServers, onOk) {
         //Создадим также сервер, указывающий на расположение провайдера.
-        prefs.repos.__self = {path: window.location.href.replace(/^file:\/\/\//i, '').replace(/[^\\\/]+$/, '')};
+        var providerPath = decodeURI(window.location.href).replace(/^file:\/\/\//i, '').replace(/[^\\\/]+$/, '');
+        prefs.repos.__self = {path: providerPath};
+
+        if(/\s+/i.test(providerPath)){
+            //проверяем, что путь к текущему провайдеру не содержит пробелов
+            g_repoServers.__self = {
+                id: '__self',
+                path: providerPath,
+                status: false,
+                statusMessage: "Path to current provider <code>" + providerPath + "</code> should not contain spaces!"
+            }
+            callFinalComplete(onOk, g_repoServers);
+            return;
+        }
 
         for (var repo in prefs.repos) {
             var r = prefs.repos[repo];
@@ -895,6 +926,7 @@ Prepairing provider files...
                 createAndStartServer(repo, onOk);
             }
         }
+
         callFinalComplete(onOk, g_repoServers);
     }
 
