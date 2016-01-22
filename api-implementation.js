@@ -551,6 +551,10 @@ var AnyBalanceDebuggerApi;
         $button.prop('disabled', true).attr('id', 'buttonExecute');
 
         chrome.storage.local.get(['abd-replace-3xx', 'repos', 'repos-prefer-source', 'clear-cookies'], function (items) {
+            //Умолчательные значения делаем здесь
+            if (!items.repos)
+                items.repos = {'default': {path: ''}};
+
             for (var prop in items)
                 g_global_config[prop] = items[prop];
             configureByPreferences();
@@ -648,9 +652,6 @@ var AnyBalanceDebuggerApi;
                     return all[i].id;
             }
         }
-
-        if (!repos)
-            repos = {'default': {path: ''}};
 
         var i = 0;
         for (var id in repos) {
@@ -792,7 +793,8 @@ Prepairing provider files...
                 });
             }).fail(function (jqXHR, textStatus, errorThrown) {
                 $('#loading_status').html('<a href="http://fenixwebserver.com" target=_blank>Fenix server</a> is unavailable. Run it or use local debugging.');
-                console.log('error: ' + textStatus);
+                $('#buttonExecute').prop('disabled', false);
+                console.log('Fenix status cannot be fetched: ' + textStatus + ', ' + errorThrown);
             });
     }
 
