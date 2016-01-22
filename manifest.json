@@ -1,7 +1,7 @@
 {
   "name": "AnyBalance Debugger",
   "manifest_version": 2,
-  "version": "3.9.3",
+  "version": "3.9.4",
   "description": "Provides support for AnyBalance provider debugging",
   "permissions": [
     "webRequest",

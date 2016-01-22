@@ -841,7 +841,8 @@ Prepairing provider files...
         $.ajax('http://localhost:33649/server', {
             method: "POST",
             data: JSON.stringify({
-                name: "AB Repo " + repo,
+                //Постараемся найти id провайдера для своей папки
+                name: "AB Repo " + (repo == '__self' ? r.path.replace(/.*[\/\\]([^\/\\]+)[\/\\]?$/i, '$1') + ' (self)' : repo),
                 path: r.path,
                 port: r.port || ++g_auto_port
             }),
