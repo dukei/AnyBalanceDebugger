@@ -842,7 +842,7 @@ Prepairing provider files...
             method: "POST",
             data: JSON.stringify({
                 //Постараемся найти id провайдера для своей папки
-                name: "AB Repo " + (repo == '__self' ? r.path.replace(/.*[\/\\]([^\/\\]+)[\/\\]?$/i, '$1') + ' (self)' : repo),
+                name: "AB " + (repo == '__self' ? 'Provider ' + r.path.replace(/.*[\/\\]([^\/\\]+)[\/\\]?$/i, '$1') : 'Repo ' + repo),
                 path: r.path,
                 port: r.port || ++g_auto_port
             }),
