@@ -24,11 +24,7 @@
         "core-min.js",
         "enc-base64-min.js",
         "base64arr.js",
-        "sh/scripts/shCore.js",
-        "sh/scripts/shBrushCss.js",
-        "sh/scripts/shBrushJScript.js",
-        "sh/scripts/shBrushPlain.js",
-        "sh/scripts/shBrushXml.js",
+        "sh/highlight.min.js",
         "json-viewer/jquery.json-viewer.js",
         "grid/grid-0.5.6.min.js",
         "lab.src.js",
@@ -37,10 +33,8 @@
       ],
       "css": [
         "styles.css",
-        "sh/styles/shCore.css",
-        "sh/styles/shCoreDefault.css",
-        "sh/styles/shThemeDefault.css",
         "json-viewer/jquery.json-viewer.css",
+        "sh/highlight.min.css",
         "jquery-ui/jquery-ui.min.css",
         "grid/grid-0.5.6.min.css"
       ]

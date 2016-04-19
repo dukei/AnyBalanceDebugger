@@ -12,13 +12,18 @@ body {
 
 .expandable {
     display: none;
-    background-color: yellow;
+    position: relative;
+    background-color: lightyellow;
     border: 1px solid brown;
-    max-height: 100%;
+    overflow: scroll;
+    max-height: 80%;
 }
 
-.expandable .syntaxhighlighter {
-    max-height: 80%;
+.expandable .copy{
+	display: block;
+	position: absolute;
+	right: 5px;
+	top: 0px;
 }
 
 .restricted {

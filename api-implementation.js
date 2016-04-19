@@ -125,24 +125,8 @@ var AnyBalanceDebuggerApi;
             request.setRequestHeader('abd-data', JSON.stringify({headers: headers, options: options})); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
         }
 
-        function getBrush(xhr) {
-            var str = xhr.getResponseHeader('Content-Type');
-            if (!str)
-                return new SyntaxHighlighter.brushes.Plain();
-            if (/xml|html/i.test(str))
-                return new SyntaxHighlighter.brushes.Xml();
-            if (/javascript|json/i.test(str))
-                return new SyntaxHighlighter.brushes.JScript();
-            if (/css/i.test(str))
-                return new SyntaxHighlighter.brushes.CSS();
-            return new SyntaxHighlighter.brushes.Plain();
-        }
-
-        function highlightText(text, xhr) {
-            SyntaxHighlighter.defaults['html-script'] = true;
-            var brush = getBrush(xhr);
-            brush.init({toolbar: false});
-            return brush.getHtml(text.replace(/&/g, '&amp;'));
+        function highlightText(text) {
+            return hljs.highlightAuto(text).value;
         }
 
         function callBackground(rpccall) {
@@ -290,6 +274,36 @@ var AnyBalanceDebuggerApi;
             return o;
         }
 
+        function toggleHtml(e, serverResponse){
+        	var $elem = $(e.target);
+        	if(!$elem.prop('initialized')){
+        		var id='sr' + Math.round(Math.random()*100000000);
+        		$elem.next().html('<a href="#" class="copy" title="Select All">&#9931;</a><pre id="' + id + '">' + highlightText(serverResponse) + '</pre>');
+        		$elem.next().find("a.copy").on('click', function(){SelectText(id); return false});
+        		$elem.prop('initialized', '1');
+        	}
+        	$elem.next().toggle('fast');
+        	return false;
+        }
+
+        //http://stackoverflow.com/questions/985272/selecting-text-in-an-element-akin-to-highlighting-with-your-mouse
+        function SelectText(element) {
+            var doc = document
+                , text = doc.getElementById(element)
+                , range, selection;    
+            if (doc.body.createTextRange) {
+                range = document.body.createTextRange();
+                range.moveToElementText(text);
+                range.select();
+            } else if (window.getSelection) {
+                selection = window.getSelection();        
+                range = document.createRange();
+                range.selectNodeContents(text);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+		}
+
         function request(defaultMethod, url, data, json, headers, options) {
             var method = defaultMethod;
             try {
@@ -345,7 +359,9 @@ var AnyBalanceDebuggerApi;
                 }
 
                 console.log(method + " result (" + xhr.status + "): " + serverResponse.substr(0, 255));
-                html_output(method + " result (" + xhr.status + "): " + '<a href="#" onclick="$(this).next().toggle(\'fast\'); return false">show/hide</a><div class="expandable">' + highlightText(serverResponse, xhr) + '</div>');
+                var id = 'shh' + new Date().getTime();
+                html_output(method + " result (" + xhr.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
+                $('#' + id).on('click', function(e){return toggleHtml(e, serverResponse)});
                 return serverResponse;
             } catch (e) {
                 m_lastError = '' + e.name + ': ' + e.message;
