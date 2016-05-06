@@ -274,11 +274,11 @@ var AnyBalanceDebuggerApi;
             return o;
         }
 
-        function toggleHtml(e, serverResponse){
+        function toggleHtml(e, text){
         	var $elem = $(e.target);
         	if(!$elem.prop('initialized')){
         		var id='sr' + Math.round(Math.random()*100000000);
-        		$elem.next().html('<a href="#" class="copy" title="Select All">&#9931;</a><pre id="' + id + '">' + highlightText(serverResponse) + '</pre>');
+        		$elem.next().html('<a href="#" class="copy" title="Select All">&#9931;</a><pre id="' + id + '">' + highlightText(text) + '</pre>');
         		$elem.next().find("a.copy").on('click', function(){SelectText(id); return false});
         		$elem.prop('initialized', '1');
         	}
@@ -561,17 +561,20 @@ var AnyBalanceDebuggerApi;
 	<div id="tabs-2"></div>
 </div>`;
 
-    function onLoadContentDocument() {
-        var $div = $('<div id="initialContent"/>');
-        var $body = $('body');
-        $body.children().appendTo($div);
-        $div.appendTo($body);
+	var initialContent = `<div id="initialContent">
+        <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>
+        <button onclick="api_onload()">Execute</button>
+        <div id="AnyBalanceDebuggerLog"></div>
+    </div>`;
 
-        $body.append($(tabs));
-        var $initialContent = $('#initialContent');
-        $initialContent.prepend('<div id="abdVersion">AnyBalance Debugger v.' + chrome.runtime.getManifest().version + '</div>');
-        $initialContent.prepend('<div id="abdHelp"><a target="_blank" href="https://github.com/dukei/any-balance-providers/wiki/AnyBalanceDebugger">Help</a></div>');
-        $initialContent.appendTo('#tabs-1');
+    function onLoadContentDocument() {
+        var $body = $('body');
+        $body.html(tabs);
+
+        $tabs = $('#tabs');
+        $tabs.prepend('<div id="abdVersion">AnyBalance Debugger v.' + chrome.runtime.getManifest().version + '</div>');
+        $tabs.prepend('<div id="abdHelp"><a target="_blank" href="https://github.com/dukei/any-balance-providers/wiki/AnyBalanceDebugger">Help</a></div>');
+        $('#tabs-1').html(initialContent);
 
         var $button = $('button').first();
         $button.prop('disabled', true).attr('id', 'buttonExecute');
@@ -593,7 +596,7 @@ var AnyBalanceDebuggerApi;
             .script(chrome.extension.getURL('jquery-ui/jquery.min.js'))
             .script(chrome.extension.getURL('json-viewer/jquery.json-viewer.js'))
             .script(chrome.extension.getURL('api-adapter.js'))
-            .script(chrome.extension.getURL('api.js'))
+            .script(chrome.extension.getURL('api.min.js'))
             .wait(function () {
                 window.postMessage({type: "INITIALIZE_PAGE_SCRIPT"}, "*");
             });

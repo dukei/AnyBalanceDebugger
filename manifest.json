@@ -1,7 +1,7 @@
 {
   "name": "AnyBalance Debugger",
   "manifest_version": 2,
-  "version": "3.9.4",
+  "version": "3.9.5",
   "description": "Provides support for AnyBalance provider debugging",
   "permissions": [
     "webRequest",
@@ -47,7 +47,7 @@
     ]
   },
   "web_accessible_resources": [
-    "api.js",
+    "api.min.js",
     "api-adapter.js",
     "jquery-ui/jquery.min.js",
     "json-viewer/jquery.json-viewer.js",
