@@ -466,14 +466,15 @@ var AnyBalanceDebuggerApi;
             },
 
             getCapabilities: function () {
-                return JSON.stringify({
+                return {
                     captcha: true,
+                    recaptcha2: true,
                     preferences: false,
                     async: false,
                     persistence: true,
                     requestOptions: true,
                     requestCharset: true
-                });
+                };
             },
 
             setCookie: function (domain, name, val, params) {
@@ -514,14 +515,58 @@ var AnyBalanceDebuggerApi;
                         }).appendTo('body');
                     }
 
-                    $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '">').show();
-                    dlgReturnValue = prompt(comment, "");
-                    $('#AnyBalanceDebuggerPopup').hide();
+                    if(options)
+                    	options = JSON.parse(options);
+                    if(!options || !options.type || options.type != 'recaptcha2'){
+                        $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '">').show();
+                        
+                   	   	//Just continue here (F8, . This breakpoint is necessary to update DOM state 
+                        debugger; //According to https://bugs.chromium.org/p/chromium/issues/detail?id=639150
+                        
+                        dlgReturnValue = prompt(comment, "");
+                        $('#AnyBalanceDebuggerPopup').hide();
+                        
+                        if (!dlgReturnValue)
+                            throw {name: 'retrieveCode', message: 'User has cancelled entering the code!'};
+                        
+                        return dlgReturnValue;
+                    }else if(options.type == 'recaptcha2'){
+                    	//Для распознавания рекапчи обращаемся на localhost:1500 к программке AnyBalance Recaptcha.
+                    	//Должна быть установлена и запущена локально
+                    	
+                    	var dataOut = null;
+                        $.ajax('http://localhost:1500/recaptcha', {
+                            method: "POST",
+                            async: false,
+                            data: {
+                                URL: options.url,
+                                SITEKEY: options.sitekey,
+                                TEXT: comment,
+                                TIMELIMIT: options.time
+                            }
+                        }).done(function (data) {
+                        	if(data != 'OK')
+                        		throw {name: 'retrieveCode', message: data};
 
-                    if (!dlgReturnValue)
-                        throw {name: 'retrieveCode', message: 'User has cancelled entering the code!'};
-
-                    return dlgReturnValue;
+                        	do{
+                        		sleep(5000);
+                        		$.ajax('http://localhost:1500/result', {
+                            		method: "GET",
+                            		async: false,
+                        		}).done(function (data) {
+                        			if(data == 'TIMEOUT')
+                        				throw {name: 'retrieveCode', message: "Captcha timeout"};
+                        		    if(data != 'IN_PROGRESS')
+                        		    	dataOut = data; //получили ответ на капчу
+                        		}).fail(function (xhr) {
+                       				throw {name: 'retrieveCode', message: xhr.responseText};
+		                        });
+                        	}while(!dataOut);
+                        }).fail(function (xhr) {
+                       		throw {name: 'retrieveCode', message: xhr.responseText};
+                        });
+                        return dataOut;
+                    }
                 } catch (e) {
                     m_lastError = '' + e.name + ': ' + e.message;
                     api_trace("Error in retrieve: " + m_lastError);
@@ -964,6 +1009,10 @@ Prepairing provider files...
 
         for (var i = 0; i < curServers.length; ++i) {
             var s = curServers[i];
+            if(typeof(s.path) == 'object'){
+            	console.log('Path for fenix server ' + s.name + ' is invalid, skipping: ' + JSON.stringify(s));
+            	continue;
+            }
             var spath = normalizePath(s.path).toLowerCase();
             if (lPath.indexOf(spath) == 0) {
                 if (s.running && maxRunningPathLength < spath.length) {
