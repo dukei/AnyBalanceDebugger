@@ -541,6 +541,7 @@ var AnyBalanceDebuggerApi;
                             data: {
                                 URL: options.url,
                                 SITEKEY: options.sitekey,
+                                USERAGENT: options.userAgent,
                                 TEXT: comment,
                                 TIMELIMIT: options.time
                             }
