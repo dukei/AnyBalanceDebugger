@@ -466,7 +466,7 @@ var AnyBalanceDebuggerApi;
             },
 
             getCapabilities: function () {
-                return {
+                return JSON.stringify({
                     captcha: true,
                     recaptcha2: true,
                     preferences: false,
@@ -474,7 +474,7 @@ var AnyBalanceDebuggerApi;
                     persistence: true,
                     requestOptions: true,
                     requestCharset: true
-                };
+                });
             },
 
             setCookie: function (domain, name, val, params) {

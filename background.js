@@ -59,7 +59,7 @@ function ABDBackend(tabId) {
 
         if (val === null || val === undefined || val === '') {
             chrome.cookies.remove({
-                url: 'https://' + domain + '/',
+                url: 'https://' + domain + ((params && params.path) || '/'), //Путь надо правильный указать, иначе не удаляется
                 name: name
             }, onCookieRemoved);
         } else {
