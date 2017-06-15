@@ -518,7 +518,11 @@ var AnyBalanceDebuggerApi;
                     if(options)
                     	options = JSON.parse(options);
                     if(!options || !options.type || options.type != 'recaptcha2'){
-                        $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '">').show();
+                        $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '"><p><small>Если вы не видите картинку здесь, посмотрите её в консоли</small>').show();
+
+                        //Начиная с какой-то версии хрома картинки не грузятся, пока скрипт не освободится. Так что выведем картинку в консоль
+                        console.log(comment);
+                        console.log('%c ', 'padding: 100px 100px; line-height: 100px; background-repeat: no-repeat; background-position: left center; background-size: contain; background-image: url(data:image/png;base64,' + image + ')')
                         
                    	   	//Just continue here (F8, . This breakpoint is necessary to update DOM state 
                         debugger; //According to https://bugs.chromium.org/p/chromium/issues/detail?id=639150
