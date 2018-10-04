@@ -132,9 +132,24 @@ function ABDBackend(tabId) {
         checkAllCookiesCleared();
     }
 
+    function getCurrentCookieStoreId(callback){
+        chrome.cookies.getAllCookieStores(function(css){
+        	for(let cs of css){
+        		if(cs.tabIds.indexOf(m_tabId) >= 0){
+        			callback(cs.id);
+        			return;
+        		}
+        	}
+        	callback();		
+        });
+    }
+
     function clearAllCookies(){
         m_opResult = undefined;
-        chrome.cookies.getAll({}, onCookiesGetAllForCleaning);
+        getCurrentCookieStoreId(function (csid) {
+        	console.log('Cleaning cookies for store ' + csid);
+        	chrome.cookies.getAll({storeId: csid}, onCookiesGetAllForCleaning);
+        });
     }
 
     function getOpResult() {
