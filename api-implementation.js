@@ -613,7 +613,7 @@ var AnyBalanceDebuggerApi;
 
 	var initialContent = `<div id="initialContent">
         <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>
-        <button onclick="api_onload()">Execute</button>
+        <button>Execute</button>
         <div id="AnyBalanceDebuggerLog"></div>
     </div>`;
 

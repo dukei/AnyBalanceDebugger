@@ -57,29 +57,34 @@ function ABDBackend(tabId) {
     function setCookie(domain, name, val, params) {
         m_opResult = undefined;
 
-        if (val === null || val === undefined || val === '') {
-            chrome.cookies.remove({
-                url: 'https://' + domain + ((params && params.path) || '/'), //Путь надо правильный указать, иначе не удаляется
-                name: name
-            }, onCookieRemoved);
-        } else {
-            if (!params)
-                params = {};
+        if (!params)
+            params = {};
 
-            var path = params.path;
-            if (!path) path = '/';
-            if (!/^\//.test(path))
-                path = '/' + path;
+        var path = params.path;
+        if (!path) path = '/';
+        if (!/^\//.test(path))
+            path = '/' + path;
 
-            chrome.cookies.set({
-                url: 'https://' + domain + path,
-                name: name,
-                value: val,
-                // path: params.path, //С этим параметром почему-то ошибка. А если в урл помещать, работает
-                secure: params.secure,
-                expirationDate: params.expire && Math.round(new Date(params.expire).getTime() / 1000)
-            }, onCookieSet);
-        }
+        getCurrentCookieStoreId(function(csid){
+            if (val === null || val === undefined || val === '') {
+                chrome.cookies.remove({
+                    url: 'https://' + domain + path, //Путь надо правильный указать, иначе не удаляется
+                    name: name,
+                    storeId: csid
+                }, onCookieRemoved);
+            } else {
+                chrome.cookies.set({
+                    url: 'https://' + domain + path,
+                    name: name,
+                    value: val,
+                    domain: params.domain || domain,
+                    path: path,
+                    secure: params.secure,
+                    expirationDate: params.expire && Math.round(new Date(params.expire).getTime() / 1000),
+                    storeId: csid
+                }, onCookieSet);
+            }
+        });
     }
 
     function getCookies() {
