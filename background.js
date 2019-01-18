@@ -89,7 +89,9 @@ function ABDBackend(tabId) {
 
     function getCookies() {
         m_opResult = undefined;
-        chrome.cookies.getAll({}, onCookiesGetAll);
+        getCurrentCookieStoreId(function (csid) {
+        	chrome.cookies.getAll({storeId: csid}, onCookiesGetAll);
+        });
     }
 
     function onCookiesGetAll(cookies) {
