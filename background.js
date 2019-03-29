@@ -163,6 +163,20 @@ function ABDBackend(tabId) {
         return m_opResult;
     }
 
+    async function requestLocalhost(port, path, params){
+        let response = await fetch('http://localhost:' + port + '/' + path, params);
+        return await response.text();
+    }
+
+    async function requestLocalhostSync(port, path, params){
+        try {
+            m_opResult = undefined;
+            m_opResult = {result: await requestLocalhost(port, path, params)};
+        }catch(e){
+            m_opResult = {error: e.message || "Error requesting localhost:" + port + '/' + path};
+        }
+    }
+
     return {
         getTabId: getTabId,
 
@@ -187,7 +201,10 @@ function ABDBackend(tabId) {
             console.log('dummy');
         },
 
-        clearAllCookies: clearAllCookies
+        clearAllCookies: clearAllCookies,
+
+        requestLocalhost: requestLocalhost,
+        requestLocalhostSync: requestLocalhostSync,
     };
 };
 
@@ -340,14 +357,24 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
 chrome.extension.onMessage.addListener(
     function (request, sender, sendResponse) {
-        if (!sender.tab) {
-            console.log('Unknown message received, expected message from tab.');
-            return;
-        }
+    	(async function(){
+            try{
+                if (!sender.tab) {
+                    console.log('Unknown message received, expected message from tab.');
+                    return;
+                }
 
-        var backend = abd_getBackend(sender.tab.id, request.method == 'initialize');
-        var result = backend[request.method].apply(backend, request.params);
-        sendResponse({result: result});
+                let backend = abd_getBackend(sender.tab.id, request.method == 'initialize');
+                if(!backend)
+                    backend = abd_getBackend(sender.tab.id, true);
+
+                let result = await backend[request.method].apply(backend, request.params);
+                sendResponse({result: result});
+            }catch(e){
+                sendResponse({error: e});
+            }
+        })();
+        return true;
     }
 );
 

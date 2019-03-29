@@ -1,8 +1,8 @@
 //content script initialization
-var AnyBalanceDebuggerApi;
+let AnyBalanceDebuggerApi;
 
 (function () {
-    var g_global_config = {
+    let g_global_config = {
         //Умолчательные значения делаем здесь
 
         //Подтягивать исходники модулей вместе самой новой скомпилированной версии
@@ -21,19 +21,34 @@ var AnyBalanceDebuggerApi;
     $.fn.HasVerticalScrollBar = function () {
         //note: clientHeight= height of holder
         //scrollHeight= we have content till this height
-        var _elm = $(this)[0];
-        var _hasScrollBar = false;
+        let _elm = $(this)[0];
+        let _hasScrollBar = false;
         if (_elm.clientHeight < _elm.scrollHeight) {
             _hasScrollBar = true;
         }
         return _hasScrollBar;
+    };
+
+    async function callBackgroundAsync(rpccall) {
+    	return new Promise((resolve, reject) => {
+    		chrome.extension.sendMessage(rpccall, (response) => {
+    		    if(!typeof response === 'object') {
+                    console.error(rpccall, response);
+                    throw new Error('Invalid response from background!!! ');
+                }
+    			if(response.error)
+    				reject(response.error);
+    			else
+    				resolve(response.result);
+    		});
+    	}).catch(e => {throw e});
     }
 
     AnyBalanceDebuggerApi = function () {
-        var API_LEVEL = 9;
+        const API_LEVEL = 9;
 
         function restrictedIn() {
-            var $content = $(this).find(".content");
+            let $content = $(this).find(".content");
             if ($content.height() > 100 || $content.HasVerticalScrollBar()) {
                 $content.unbind('click').click(restrictedClick).parent().find('.expandButton').unbind('click').click(restrictedClick).text($content.HasVerticalScrollBar() ? 'Expand' : 'Collapse').show();
             }
@@ -44,7 +59,7 @@ var AnyBalanceDebuggerApi;
         }
 
         function restrictedClick() {
-            var $content = $(this).parent().find(".content");
+            let $content = $(this).parent().find(".content");
             if ($content.HasVerticalScrollBar())
                 $content.css('max-height', 'none');
             else
@@ -76,24 +91,24 @@ var AnyBalanceDebuggerApi;
          return encoded;
          }
          */
-        var m_lastError = '';
-        var m_credentials = {};
-        var m_options = {};
-        var m_backgroundInitialized = false; //Инициализирован ли для данной вкладки задок
-        var m_lastStatus; //Последний полученный статус
-        var m_lastHeaders; //Последние полученные заголовки
+        let m_lastError = '';
+        let m_credentials = {};
+        let m_options = {};
+        let m_backgroundInitialized = false; //Инициализирован ли для данной вкладки задок
+        let m_lastStatus; //Последний полученный статус
+        let m_lastHeaders; //Последние полученные заголовки
 
         function getUserAndPassword(url) {
             return {user: m_credentials.user, password: m_credentials.password};
         }
 
         function base64EncodeUtf8(str) {
-            var words = CryptoJS.enc.Utf8.parse(str);
+            let words = CryptoJS.enc.Utf8.parse(str);
             return CryptoJS.enc.Base64.stringify(words);
         }
 
         function base64EncodeBytes(str) {
-            var words = CryptoJS.enc.Latin1.parse(str);
+            let words = CryptoJS.enc.Latin1.parse(str);
             return CryptoJS.enc.Base64.stringify(words);
         }
 
@@ -101,13 +116,13 @@ var AnyBalanceDebuggerApi;
             if (headers)
                 headers = JSON.parse(headers);
             headers = headers || {};
-            var serviceHeaders = {};
+            let serviceHeaders = {};
             if (m_credentials.user) {
-                var aname = "Authorization";
-                var idx = abd_getHeaderIndex(headers, aname);
+                let aname = "Authorization";
+                let idx = abd_getHeaderIndex(headers, aname);
                 if (!isset(idx)) {
                     //Авторизация требуется, значит, надо поставить и заголовок авторизации, раз он ещё не передан
-                    var value = "Basic " + base64EncodeUtf8(m_credentials.user + ':' + m_credentials.password);
+                    let value = "Basic " + base64EncodeUtf8(m_credentials.user + ':' + m_credentials.password);
                     serviceHeaders[aname] = value;
                 }
             }
@@ -115,7 +130,7 @@ var AnyBalanceDebuggerApi;
             if (g_global_config['abd-replace-3xx'])
                 serviceHeaders['abd-replace-3xx'] = 'true';
 
-            for (var h in serviceHeaders) {
+            for (let h in serviceHeaders) {
                 if (isArray(headers))
                     headers.push([h, serviceHeaders[h]]);
                 else
@@ -130,25 +145,28 @@ var AnyBalanceDebuggerApi;
         }
 
         function callBackground(rpccall) {
-            var json = JSON.stringify(rpccall);
-            var encoded = encodeURIComponent(json);
+            let json = JSON.stringify(rpccall);
+            let encoded = encodeURIComponent(json);
 
-            var xhr = new XMLHttpRequest();
+            let xhr = new XMLHttpRequest();
             xhr.open("GET", "http://www.gstatic.com/inputtools/images/tia.png?abrnd&data=" + encoded, false);
             xhr.send();
 
-            var data = xhr.getResponseHeader('ab-data');
+            let data = xhr.getResponseHeader('ab-data');
             if (!data) {
                 console.log("Error receiving header from background!");
                 return '';
             }
 
             json = JSON.parse(data);
+            if(json.error)
+                throw json.error;
+
             return json.result;
         }
 
         function sleep(milliseconds) {
-            var start = new Date().getTime();
+            let start = new Date().getTime();
             while (new Date().getTime() < start + milliseconds);
             return true;
         }
@@ -159,7 +177,7 @@ var AnyBalanceDebuggerApi;
         }
 
         function wait4Result(milliseconds) {
-            var result, start = new Date().getTime();
+            let result, start = new Date().getTime();
             if (!milliseconds) milliseconds = 5000;
             do {
                 if (new Date().getTime() - start >= milliseconds)
@@ -176,14 +194,14 @@ var AnyBalanceDebuggerApi;
 
         // Взято с http://jqbook.narod.ru/ajax/ajax_win1251.htm
         // Инициализируем таблицу перевода
-        var transAnsiAjaxSys;
+        let transAnsiAjaxSys;
 
         function getWin1251Table() {
             if (transAnsiAjaxSys)
                 return transAnsiAjaxSys;
 
             transAnsiAjaxSys = [];
-            for (var i = 0x410; i <= 0x44F; i++)
+            for (let i = 0x410; i <= 0x44F; i++)
                 transAnsiAjaxSys[i] = i - 0x350; // А-Яа-я
             transAnsiAjaxSys[0x401] = 0xA8;    // Ё
             transAnsiAjaxSys[0x451] = 0xB8;    // ё
@@ -204,28 +222,28 @@ var AnyBalanceDebuggerApi;
 
         // Переопределяем функцию encodeURIComponent()
         function encodeURIComponentToWindows1251(str) {
-            var ret = [];
-            if (typeof(str) != 'string') str = '' + str;
+            let ret = [];
+            if (typeof(str) !== 'string') str = '' + str;
             // Составляем массив кодов символов, попутно переводим кириллицу
-            var transAnsiAjaxSys = getWin1251Table();
-            for (var i = 0; i < str.length; i++) {
-                var n = str.charCodeAt(i);
-                if (typeof transAnsiAjaxSys[n] != 'undefined')
+            let transAnsiAjaxSys = getWin1251Table();
+            for (let i = 0; i < str.length; i++) {
+                let n = str.charCodeAt(i);
+                if (typeof transAnsiAjaxSys[n] !== 'undefined')
                     n = transAnsiAjaxSys[n];
                 if (n <= 0xFF)
-                    ret.push(isInvariantWin1251Char(n) ? String.fromCharCode(n) : (n == 0x20 ? '+' : '%' + byte2Hex(n)));
+                    ret.push(isInvariantWin1251Char(n) ? String.fromCharCode(n) : (n === 0x20 ? '+' : '%' + byte2Hex(n)));
             }
             return ret.join('');
         }
 
         function byte2Hex(N) {
-            var str = N.toString(16);
+            let str = N.toString(16);
             if (str.length < 2) str = '0' + str;
             return str.toUpperCase();
         }
 
         function encodeURIComponentToCharset(text, charset) {
-            if (charset.toLowerCase() == 'windows-1251')
+            if (charset.toLowerCase() === 'windows-1251')
                 return encodeURIComponentToWindows1251(text);
             else
                 return encodeURIComponent(text);
@@ -237,10 +255,10 @@ var AnyBalanceDebuggerApi;
                 xhr.send(data);
                 if ([701, 702, 703, 707].indexOf(xhr.status) >= 0) {
                     //Запрос на редирект из фидлера
-                    var location = xhr.getResponseHeader('Location');
+                    let location = xhr.getResponseHeader('Location');
                     api_trace("Redirecting to (" + xhr.status + ') ' + location);
                     xhr = new XMLHttpRequest();
-                    var auth = getUserAndPassword(location);
+                    let auth = getUserAndPassword(location);
                     xhr.open("GET", location, false, auth.user, auth.password);
                     xhr.withCredentials = true;
                     data = undefined;
@@ -256,8 +274,8 @@ var AnyBalanceDebuggerApi;
         }
 
         function joinOptions(optionBase, optionNew) {
-            for (var option in optionNew) {
-                var val = optionNew[option];
+            for (let option in optionNew) {
+                let val = optionNew[option];
                 if (val === null) {
                     delete optionBase[option];
                 } else if (!isset(optionBase[option]) || !isObject(val)) {
@@ -269,15 +287,15 @@ var AnyBalanceDebuggerApi;
         }
 
         function joinOptionsToNew(optionBase, optionNew) {
-            var o = cloneObject(optionBase);
+            let o = cloneObject(optionBase);
             joinOptions(o, optionNew);
             return o;
         }
 
         function toggleHtml(e, text){
-        	var $elem = $(e.target);
+            let $elem = $(e.target);
         	if(!$elem.prop('initialized')){
-        		var id='sr' + Math.round(Math.random()*100000000);
+                let id='sr' + Math.round(Math.random()*100000000);
         		$elem.next().html('<a href="#" class="copy" title="Select All">&#9931;</a><pre id="' + id + '">' + highlightText(text) + '</pre>');
         		$elem.next().find("a.copy").on('click', function(){SelectText(id); return false});
         		$elem.prop('initialized', '1');
@@ -288,7 +306,7 @@ var AnyBalanceDebuggerApi;
 
         //http://stackoverflow.com/questions/985272/selecting-text-in-an-element-akin-to-highlighting-with-your-mouse
         function SelectText(element) {
-            var doc = document
+            let doc = document
                 , text = doc.getElementById(element)
                 , range, selection;    
             if (doc.body.createTextRange) {
@@ -305,38 +323,38 @@ var AnyBalanceDebuggerApi;
 		}
 
         function request(defaultMethod, url, data, json, headers, options) {
-            var method = defaultMethod;
+            let method = defaultMethod;
             try {
-                var auth = getUserAndPassword(url);
-                var xhr = new XMLHttpRequest();
+                let auth = getUserAndPassword(url);
+                let xhr = new XMLHttpRequest();
 
                 options = options ? JSON.parse(options) : {};
-                var local_options = options.options ? joinOptionsToNew(m_options, options.options) : m_options;
+                let local_options = options.options ? joinOptionsToNew(m_options, options.options) : m_options;
 
-                var domain = /:\/\/([^\/]+)/.exec(url);
+                let domain = /:\/\/([^\/]+)/.exec(url);
                 if (!domain)
                     throw {name: "Wrong url", message: "Malformed url for request: " + url};
 
                 method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
-                var defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
-                var charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
+                let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
+                let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
 
                 api_trace(method + " to " + url + (isset(data) ? " with data: " + data : ''));
                 xhr.open(method, url, false, auth.user, auth.password);
 
                 if (isset(data)) {
-                    var input_charset = abd_getOption(local_options, OPTION_REQUEST_CHARSET, domain) || defCharset;
+                    let input_charset = abd_getOption(local_options, OPTION_REQUEST_CHARSET, domain) || defCharset;
 
                     if (json) {
-                        var dataObj = JSON.parse(data);
+                        let dataObj = JSON.parse(data);
                         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                        var _data = [];
+                        let _data = [];
                         if (isArray(dataObj)) {
-                            for (var i = 0; i < dataObj.length; ++i) {
+                            for (let i = 0; i < dataObj.length; ++i) {
                                 _data.push(encodeURIComponentToCharset(dataObj[i][0], input_charset) + '=' + encodeURIComponentToCharset(dataObj[i][1], input_charset));
                             }
                         } else {
-                            for (var key in dataObj) {
+                            for (let key in dataObj) {
                                 _data.push(encodeURIComponentToCharset(key, input_charset) + '=' + encodeURIComponentToCharset(dataObj[key], input_charset));
                             }
                         }
@@ -350,16 +368,16 @@ var AnyBalanceDebuggerApi;
                 //if(!(200 <= xhr.status && xhr.status < 400))   //Necessary to get body for all codes
                 //	throw {name: "HTTPError", message: "Posting " + url + " failed: status " + xhr.status};
                 saveLastParameters(xhr);
-                var serverResponse = xhr.responseText;
+                let serverResponse = xhr.responseText;
 
-                var responseType = xhr.getResponseHeader("Content-Type");
+                let responseType = xhr.getResponseHeader("Content-Type");
                 if (/image\//i.test(responseType) || charset == 'base64') {
                     //Картинки преобразовываем в base64
                     serverResponse = base64EncodeBytes(serverResponse);
                 }
 
                 console.log(method + " result (" + xhr.status + "): " + serverResponse.substr(0, 255));
-                var id = 'shh' + new Date().getTime();
+                let id = 'shh' + new Date().getTime();
                 html_output(method + " result (" + xhr.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
                 $('#' + id).on('click', function(e){return toggleHtml(e, serverResponse)});
                 return serverResponse;
@@ -368,7 +386,16 @@ var AnyBalanceDebuggerApi;
                 api_trace("Error in " + method + ": " + m_lastError + "\nStack: " + e.stack);
                 return null;
             }
-        };
+        }
+
+        function serializeUrlEncoded(obj) {
+            let str = [];
+  			for (let p in obj)
+    		if (obj.hasOwnProperty(p)) {
+      			str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+    		}
+  			return str.join("&");
+		}
 
         return {
             getLastError: function () {
@@ -409,8 +436,8 @@ var AnyBalanceDebuggerApi;
             },
 
             setOptions: function (options) {
-                var options = JSON.parse(options);
-                for (opt in options) {
+                options = JSON.parse(options);
+                for (let opt in options) {
                     if (options[opt] == null)
                         m_options[opt] = undefined;
                     else
@@ -431,7 +458,7 @@ var AnyBalanceDebuggerApi;
                         if(chrome.extension.inIncognitoContext) {
                             api_trace('Clearing all cookies before executing provider...');
                             callBackground({method: 'clearAllCookies'});
-                            var cookiesCleared = wait4Result();
+                            let cookiesCleared = wait4Result();
                             api_trace(cookiesCleared + ' cookies cleared!');
                         }else{
                             api_trace('Cookies have not been cleared because it can be done in incognito mode only!');
@@ -451,15 +478,15 @@ var AnyBalanceDebuggerApi;
                     m_lastError = 'Previous request has not been made or it has failed';
                     return null;
                 }
-                var url = callBackground({method: 'getLastUrl'});
-                var headers = [];
-                var strHeaders = m_lastHeaders.split(/\r?\n/);
-                for (var i = 0; i < strHeaders.length; ++i) {
-                    var header = strHeaders[i];
+                let url = callBackground({method: 'getLastUrl'});
+                let headers = [];
+                let strHeaders = m_lastHeaders.split(/\r?\n/);
+                for (let i = 0; i < strHeaders.length; ++i) {
+                    let header = strHeaders[i];
                     if (!header) continue;
-                    var idx = header.indexOf(':');
-                    var name = header.substr(0, idx);
-                    var value = header.substr(idx + 1).replace(/^\s+/, '');
+                    let idx = header.indexOf(':');
+                    let name = header.substr(0, idx);
+                    let value = header.substr(idx + 1).replace(/^\s+/, '');
                     headers[headers.length] = [name, value];
                 }
                 return JSON.stringify({url: url, status: m_lastStatus, headers: headers});
@@ -478,28 +505,28 @@ var AnyBalanceDebuggerApi;
             },
 
             setCookie: function (domain, name, val, params) {
-                if (val && typeof(val) != 'string')
+                if (val && typeof(val) !== 'string')
                     throw {
                         name: 'setCookie',
                         message: 'Trying to set cookie ' + name + 'to an object: ' + JSON.stringify(val)
                     };
                 params = params ? JSON.parse(params) : undefined;
                 callBackground({method: 'setCookie', params: [domain, name, val, params]});
-                var result = wait4Result();
+                let result = wait4Result();
                 return result;
             },
 
             getCookies: function () {
                 callBackground({method: 'getCookies'});
-                var result = wait4Result();
+                let result = wait4Result();
                 return result ? JSON.stringify(result) : null;
             },
 
             retrieveCode: function (comment, image, options) {
                 try {
-                    var dlgReturnValue;
+                    let dlgReturnValue;
 
-                    if ($('#AnyBalanceDebuggerPopup').size() == 0) {
+                    if ($('#AnyBalanceDebuggerPopup').size() === 0) {
                         $('<div/>', {
                             id: 'AnyBalanceDebuggerPopup'
                         }).css({
@@ -517,7 +544,7 @@ var AnyBalanceDebuggerApi;
 
                     if(options)
                     	options = JSON.parse(options);
-                    if(!options || !options.type || options.type != 'recaptcha2'){
+                    if(!options || !options.type || options.type !== 'recaptcha2'){
                         $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '"><p><small>Если вы не видите картинку здесь, посмотрите её в консоли</small>').show();
 
                         //Начиная с какой-то версии хрома картинки не грузятся, пока скрипт не освободится. Так что выведем картинку в консоль
@@ -534,42 +561,41 @@ var AnyBalanceDebuggerApi;
                             throw {name: 'retrieveCode', message: 'User has cancelled entering the code!'};
                         
                         return dlgReturnValue;
-                    }else if(options.type == 'recaptcha2'){
+                    }else if(options.type === 'recaptcha2'){
                     	//Для распознавания рекапчи обращаемся на localhost:1500 к программке AnyBalance Recaptcha.
                     	//Должна быть установлена и запущена локально
-                    	
-                    	var dataOut = null;
-                        $.ajax('http://localhost:1500/recaptcha', {
-                            method: "POST",
-                            async: false,
-                            data: {
-                                URL: options.url,
-                                SITEKEY: options.sitekey,
-                                USERAGENT: options.userAgent,
-                                TEXT: comment,
-                                TIMELIMIT: options.time
-                            }
-                        }).done(function (data) {
-                        	if(data != 'OK')
-                        		throw {name: 'retrieveCode', message: data};
 
-                        	do{
-                        		sleep(5000);
-                        		$.ajax('http://localhost:1500/result', {
-                            		method: "GET",
-                            		async: false,
-                        		}).done(function (data) {
-                        			if(data == 'TIMEOUT')
-                        				throw {name: 'retrieveCode', message: "Captcha timeout"};
-                        		    if(data != 'IN_PROGRESS')
-                        		    	dataOut = data; //получили ответ на капчу
-                        		}).fail(function (xhr) {
-                       				throw {name: 'retrieveCode', message: xhr.responseText};
-		                        });
-                        	}while(!dataOut);
-                        }).fail(function (xhr) {
-                       		throw {name: 'retrieveCode', message: xhr.responseText};
-                        });
+                        let dataOut = null;
+                    	
+                    	callBackground({method: 'requestLocalhostSync', params:[
+                    		1500,
+                    		'recaptcha',
+                    		{
+                    			method: 'POST',
+                    			headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                    			body: serializeUrlEncoded({
+                                	URL: options.url,
+                                	SITEKEY: options.sitekey,
+                                	USERAGENT: options.userAgent,
+                                	TEXT: comment,
+                                	TIMELIMIT: options.time
+                    			})
+                    		}]
+                    	});
+                    	let data = wait4Result(30000);
+
+                        if(data !== 'OK')
+                            throw {name: 'retrieveCode', message: data || m_lastError};
+
+                        do{
+                            sleep(5000);
+                            callBackground({method: 'requestLocalhostSync', params:[1500, 'result']});
+                            let data = wait4Result();
+                            if(data === 'TIMEOUT')
+                                throw {name: 'retrieveCode', message: "Captcha timeout"};
+                            if(data !== 'IN_PROGRESS')
+                                dataOut = data; //получили ответ на капчу
+                        }while(!dataOut);
                         return dataOut;
                     }
                 } catch (e) {
@@ -585,7 +611,7 @@ var AnyBalanceDebuggerApi;
             },
 
             loadData: function () {
-                var data = localStorage.getItem('abd_stored_data');
+                let data = localStorage.getItem('abd_stored_data');
                 return isset(data) && data !== null ? data : "";
             },
 
@@ -594,14 +620,14 @@ var AnyBalanceDebuggerApi;
 
 // add RPC communication event
     document.addEventListener('AnyBalanceDebuggerRPC', function (e) {
-        var hiddenDiv = document.getElementById('AnyBalanceDebuggerRPCContainer');
-        var eventData = hiddenDiv.innerText;
-        var rpc = JSON.parse(eventData);
-        var ret = AnyBalanceDebuggerApi[rpc.method].apply(null, rpc.params);
+        let hiddenDiv = document.getElementById('AnyBalanceDebuggerRPCContainer');
+        let eventData = hiddenDiv.innerText;
+        let rpc = JSON.parse(eventData);
+        let ret = AnyBalanceDebuggerApi[rpc.method].apply(null, rpc.params);
         hiddenDiv.innerText = JSON.stringify({result: ret});
     });
 
-    var tabs = `
+    let tabs = `
 <div id="tabs">
 	<ul>
 		<li><a href="#tabs-1">Debugger</a></li>
@@ -611,14 +637,14 @@ var AnyBalanceDebuggerApi;
 	<div id="tabs-2"></div>
 </div>`;
 
-	var initialContent = `<div id="initialContent">
+    let initialContent = `<div id="initialContent">
         <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>
         <button>Execute</button>
         <div id="AnyBalanceDebuggerLog"></div>
     </div>`;
 
     function onLoadContentDocument() {
-        var $body = $('body');
+        let $body = $('body');
         $body.html(tabs);
 
         $tabs = $('#tabs');
@@ -626,14 +652,14 @@ var AnyBalanceDebuggerApi;
         $tabs.prepend('<div id="abdHelp"><a target="_blank" href="https://github.com/dukei/any-balance-providers/wiki/AnyBalanceDebugger">Help</a></div>');
         $('#tabs-1').html(initialContent);
 
-        var $button = $('button').first();
+        let $button = $('button').first();
         $button.prop('disabled', true).attr('id', 'buttonExecute');
 
-        var props = [];
-        for(var prop in g_global_config){ props.push(prop) }
+        let props = [];
+        for(let prop in g_global_config){ props.push(prop) }
         chrome.storage.local.get(props, function (items) {
             //Перезатрем умолчательные значения полученными
-            for (var prop in items)
+            for (let prop in items)
                 g_global_config[prop] = items[prop];
 
             configureByPreferences();
@@ -652,7 +678,7 @@ var AnyBalanceDebuggerApi;
             });
     }
 
-    var prefsTab = `
+    let prefsTab = `
 <h3>Network error bug workaround</h3>
 <input type="checkbox" id="abd-replace-3xx" name="abd-replace-3xx" value="1"><label for="abd-replace-3xx">Enable 3xx replace</label><br/>
 <small>
@@ -720,24 +746,24 @@ var AnyBalanceDebuggerApi;
     }
 
     function setupPreferencesReposTable() {
-        var repos = g_global_config.repos;
+        let repos = g_global_config.repos;
         $('#tabs-2').append($(prefsTab));
 
-        var data = [], grid, dialog;
+        let data = [], grid, dialog;
 
         function findByName(name) {
-            var all = grid.getAll();
-            for (var i = 0; i < all.length; ++i) {
-                if (all[i].record.Name == name)
+            let all = grid.getAll();
+            for (let i = 0; i < all.length; ++i) {
+                if (all[i].record.Name === name)
                     return all[i].id;
             }
         }
 
-        var i = 0;
-        for (var id in repos) {
-            var r = repos[id];
+        let i = 0;
+        for (let id in repos) {
+            let r = repos[id];
 
-            var d = {
+            let d = {
                 ID: ++i,
                 Name: id,
                 Path: r.path
@@ -773,16 +799,16 @@ var AnyBalanceDebuggerApi;
         }
 
         function Save() {
-            var idstr = $("#ID").val();
-            var name = $("#Name").val(), path = $("#Path").val();
+            let idstr = $("#ID").val();
+            let name = $("#Name").val(), path = $("#Path").val();
             if(/["\s]/.test(path)) {
                 alert('Path to module repository can not contain quotes (") or spaces. Please specify another path.');
                 return;
             }
 
             if (idstr) {
-                var id = parseInt(idstr);
-                if (findByName(name) != id) {
+                let id = parseInt(idstr);
+                if (findByName(name) !== id) {
                     alert('Repo ' + name + ' is already defined!');
                     return;
                 }
@@ -823,19 +849,19 @@ var AnyBalanceDebuggerApi;
         });
 
         function saveRepos(){
-            var repos = {};
-            var all = grid.getAll();
-            for (var i = 0; i < all.length; ++i) {
-                var r = {path: all[i].record.Path};
+            let repos = {};
+            let all = grid.getAll();
+            for (let i = 0; i < all.length; ++i) {
+                let r = {path: all[i].record.Path};
                 repos[all[i].record.Name] = r;
             }
             chrome.storage.local.set({'repos': repos}, function () {
                 g_global_config.repos = repos;
             });
-        };
+        }
     }
 
-    var animation = `
+    let animation = `
 <div id="loading_status">
 <div id="loading_animation">
     <div id="block_1" class="barlittle"></div>
@@ -850,45 +876,55 @@ Prepairing provider files...
 </div>
 `;
 
-    var g_repoServers = {},
+    let g_repoServers = {},
         g_auto_port = 8900;
 
     function configureByPreferences() {
-        var prefs = g_global_config;
+        let prefs = g_global_config;
 
         $('#abd-replace-3xx').prop('checked', prefs['abd-replace-3xx']);
         $('#AnyBalanceDebuggerLog').before(animation);
 
-        $.ajax('http://localhost:33649/server/list')
-            .done(function (data, textStatus, jqXHR) {
-                configureRepoServers(prefs, data, function (ok, failedList) {
+        callBackgroundAsync({method: 'requestLocalhost', params:[33649, 'server/list']})
+            .then(function (data) {
+                configureRepoServers(prefs, JSON.parse(data), function (ok, failedList) {
                     if (ok) {
-                        var files = loadProviderFiles(function (ok, failedList) {
+                        let files = loadProviderFiles(function (ok, failedList) {
                             if(!ok){
                                 AnyBalanceDebuggerApi.trace("WARNING: Some dependencies were not loaded (" + failedList.join(', ') + "). Check network tab for details.");
                             }
-                            $('#buttonExecute').prop('disabled', false);
-                            $('#loading_status').hide();
+
+                            fetch('https://google.com').then(response => {
+                                return response.text();
+                            }).then(text => {
+                                if(!text){
+                                    $('#loading_status').html('ERROR: You should run chrome with special command line to use this extension!');
+                                    AnyBalanceDebuggerApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --force-empty-corb-allowlist --enable-features=NetworkService . Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
+                                }else{
+                                    $('#buttonExecute').prop('disabled', false);
+                                    $('#loading_status').hide();
+                                }
+                            });
                         });
                     } else {
-                        var failedRepos = [];
-                        for(var i=0; i<failedList.length; ++i){
+                        let failedRepos = [];
+                        for(let i=0; i<failedList.length; ++i){
                             failedRepos.push(failedList[i] + ': ' + g_repoServers[failedList[i]].statusMessage);
                         }
                         $('#loading_status').html('ERROR: The following repositories failed:<br>&nbsp;&nbsp;&nbsp;&nbsp;' + failedRepos.join('<br>&nbsp;&nbsp;&nbsp;&nbsp;'));
                     }
                 });
-            }).fail(function (jqXHR, textStatus, errorThrown) {
+            }).catch(function (errorThrown) {
                 $('#loading_status').html('<a href="http://fenixwebserver.com" target=_blank>Fenix server</a> is unavailable. Run it or use local debugging.');
                 $('#buttonExecute').prop('disabled', false);
-                console.log('Fenix status can not be fetched: ' + textStatus + ', ' + errorThrown);
+                console.log('Fenix status can not be fetched: ' + errorThrown);
             });
     }
 
     function callFinalComplete(onFinalComplete, objects) {
-        var failedObjects = [];
-        for (var key in objects) {
-            var r = objects[key];
+        let failedObjects = [];
+        for (let key in objects) {
+            let r = objects[key];
             if (!isset(r.status))
                 return; //Ещё ждем
             if (!r.status)
@@ -899,7 +935,7 @@ Prepairing provider files...
 
     function createAndStartServer(repo, onComplete, allServers) {
         allServers = allServers || g_repoServers;
-        var r = allServers[repo];
+        let r = allServers[repo];
         if (!r.path) {
             r.status = false;
             r.statusMessage = 'Please configure module repository local paths (see Properties tab)!';
@@ -907,23 +943,26 @@ Prepairing provider files...
             return;
         }
 
-        $.ajax('http://localhost:33649/server', {
-            method: "POST",
-            data: JSON.stringify({
-                //Постараемся найти id провайдера для своей папки
-                name: "AB " + (repo == '__self' ? 'Provider ' + r.path.replace(/.*[\/\\]([^\/\\]+)[\/\\]?$/i, '$1') : 'Repo ' + repo),
-                path: r.path,
-                port: r.port || ++g_auto_port
-            }),
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-            .done(function (data) {
-                if(typeof data == 'string'){
+        callBackgroundAsync({method: 'requestLocalhost', params:[33649, 'server',
+        	{
+            	method: "POST",
+            	body: JSON.stringify({
+                	//Постараемся найти id провайдера для своей папки
+                	name: "AB " + (repo === '__self' ? 'Provider ' + r.path.replace(/.*[\/\\]([^\/\\]+)[\/\\]?$/i, '$1') : 'Repo ' + repo),
+                	path: r.path,
+                	port: r.port || ++g_auto_port
+            	}),
+            	headers: {
+                	'Content-Type': 'application/json'
+            	}
+        	}
+        ]})
+            .then(function (data) {
+                if(!/^\{/i.test(data)){
                     r.status = false;
                     r.statusMessage = 'Can not create server: ' + data;
                 }else {
+                    data = JSON.parse(data);
                     r.port = data.port;
                     r.id = data.id;
                     if (data.running)
@@ -932,9 +971,9 @@ Prepairing provider files...
                         startServer(repo, onComplete, allServers);
                 }
                 callFinalComplete(onComplete, allServers);
-            }).fail(function (xhr) {
+            }).catch(function (error) {
                 r.status = false;
-                r.statusMessage = 'Can not start server: ' + xhr.status + ' ' + xhr.statusText;
+                r.statusMessage = 'Can not start server: ' + error;
                 callFinalComplete(onComplete, allServers);
             });
 
@@ -942,15 +981,16 @@ Prepairing provider files...
 
     function startServer(repo, onComplete, allServers) {
         allServers = allServers || g_repoServers;
-        var r = allServers[repo];
+        let r = allServers[repo];
         if (!isset(r.status)) {
-            $.ajax('http://localhost:33649/server/' + encodeURIComponent(r.id) + '/start', {method: "PUT"})
-                .done(function (data) {
+
+        	callBackgroundAsync({method: 'requestLocalhost', params:[33649, 'server/' + encodeURIComponent(r.id) + '/start', {method: "PUT"} ] })
+                .then(function (data) {
                     r.status = true;
                     callFinalComplete(onComplete, allServers);
-                }).fail(function (xhr) {
+                }).catch(function (error) {
                     r.status = false;
-                    r.statusMessage = 'Can not start server: ' + xhr.status + ' ' + xhr.statusText;
+                    r.statusMessage = 'Can not start server: ' + error;
                     callFinalComplete(onComplete, allServers);
                 });
         }
@@ -958,7 +998,7 @@ Prepairing provider files...
 
     function configureRepoServers(prefs, curServers, onOk) {
         //Создадим также сервер, указывающий на расположение провайдера.
-        var providerPath = decodeURI(window.location.href).replace(/^file:\/\/\//i, '').replace(/[^\\\/]+$/, '');
+        let providerPath = decodeURI(window.location.href).replace(/^file:\/\/\//i, '').replace(/[^\\\/]+$/, '');
         prefs.repos.__self = {path: providerPath};
 
         if(/\s+/i.test(providerPath)){
@@ -968,14 +1008,14 @@ Prepairing provider files...
                 path: providerPath,
                 status: false,
                 statusMessage: "Path to current provider <code>" + providerPath + "</code> should not contain spaces!"
-            }
+            };
             callFinalComplete(onOk, g_repoServers);
             return;
         }
 
-        for (var repo in prefs.repos) {
-            var r = prefs.repos[repo];
-            var s = findServer(curServers, r.path);
+        for (let repo in prefs.repos) {
+            let r = prefs.repos[repo];
+            let s = findServer(curServers, r.path);
             if (s) { //Сервер уже есть
                 g_repoServers[repo] = {
                     id: s.id,
@@ -1005,21 +1045,21 @@ Prepairing provider files...
     }
 
     function findServer(curServers, path) {
-        var lPath = normalizePath(path).toLowerCase();
+        let lPath = normalizePath(path).toLowerCase();
 
-        var maxServer = undefined;
-        var maxPathLength = 0;
-        var maxRunningServer = undefined;
-        var maxRunningPathLength = 0;
+        let maxServer = undefined;
+        let maxPathLength = 0;
+        let maxRunningServer = undefined;
+        let maxRunningPathLength = 0;
 
-        for (var i = 0; i < curServers.length; ++i) {
-            var s = curServers[i];
-            if(typeof(s.path) == 'object'){
+        for (let i = 0; i < curServers.length; ++i) {
+            let s = curServers[i];
+            if(typeof(s.path) === 'object'){
             	console.log('Path for fenix server ' + s.name + ' is invalid, skipping: ' + JSON.stringify(s));
             	continue;
             }
-            var spath = normalizePath(s.path).toLowerCase();
-            if (lPath.indexOf(spath) == 0) {
+            let spath = normalizePath(s.path).toLowerCase();
+            if (lPath.indexOf(spath) === 0) {
                 if (s.running && maxRunningPathLength < spath.length) {
                     maxRunningPathLength = spath.length;
                     maxRunningServer = s;
@@ -1038,7 +1078,7 @@ Prepairing provider files...
         if (!module.id)
             return path;
 
-        if (module.version == 'source')
+        if (module.version === 'source')
             return module.id + '/' + module.version + '/' + path;
 
         return module.id + '/build/' + module.version + '/' + path;
@@ -1053,21 +1093,21 @@ Prepairing provider files...
     function getRepoFileUrl(repo, path) {
         if (!repo)
             repo = '__self';
-        var r = g_repoServers[repo];
+        let r = g_repoServers[repo];
         if(r)
-            return 'http://localhost:' + r.port + '/' + (r.addPath || '') + path;
+            return [r.port, (r.addPath || '') + path];
     }
 
     function loadFileFromRepository(repo, path, onComplete) {
-        var url = getRepoFileUrl(repo, path);
-        if(url) {
-            $.ajax(url)
-                .done(function (data) {
+        let urlparts = getRepoFileUrl(repo, path);
+        if(urlparts) {
+        	callBackgroundAsync({method: 'requestLocalhost', params:[urlparts[0], urlparts[1]]})
+                .then(function (data) {
                     if (onComplete)
                         onComplete(true, data);
-                }).fail(function (xhr) {
+                }).catch(function (error) {
                     if (onComplete)
-                        onComplete(false, xhr.status + ' ' + xhr.statusText);
+                        onComplete(false, error);
                 });
         }else{
             onComplete(false, "Repository '" + repo + "' is not configured!");
@@ -1079,29 +1119,29 @@ Prepairing provider files...
         module.depends = [];
         module.status = true; //Сам модуль распарсен фактически, осталось только депендансы загрузить
 
-        var $xml = $(data);
+        let $xml = $(data);
 
         $('files', $xml).children().each(function (i, elem) {
-            var tag = elem.tagName;
-            var target = elem.getAttribute("target");
-            var name = $(elem).text().trim();
-            if (tag == 'js' && !target) {
+            let tag = elem.tagName;
+            let target = elem.getAttribute("target");
+            let name = $(elem).text().trim();
+            if (tag.toLowerCase() === 'js' && !target) {
                 module.files.push(name);
             }
         });
 
         $('depends', $xml).children().each(function (i, elem) {
-            var repo = elem.getAttribute("repo");
+            let repo = elem.getAttribute("repo");
             if (!repo) repo = 'default';
-            var module_id = elem.getAttribute("id");
-            var version = elem.getAttribute("version");
+            let module_id = elem.getAttribute("id");
+            let version = elem.getAttribute("version");
             if (!version)
                 version = 'head';
-            if(version == 'head' && g_global_config['repos-prefer-source'])
+            if(version === 'head' && g_global_config['repos-prefer-source'])
                 version = 'source';
-            var possibleModule = g_modules[repo + ':' + module_id];
+            let possibleModule = g_modules[repo + ':' + module_id];
             if (!possibleModule) {
-                var _module = g_modules[repo + ':' + module_id] = {
+                let _module = g_modules[repo + ':' + module_id] = {
                     repo: repo,
                     id: module_id,
                     version: version
@@ -1121,8 +1161,8 @@ Prepairing provider files...
                     });
                 })(_module);
             } else {
-                if (possibleModule.version != version) {
-                    var curMod = module.repo ? 'Module ' + module.repo + ':' + module.id + '(' + module.version + ')' : 'Current provider'
+                if (possibleModule.version !== version) {
+                    let curMod = module.repo ? 'Module ' + module.repo + ':' + module.id + '(' + module.version + ')' : 'Current provider'
                     AnyBalanceDebuggerApi.trace("WARNING: " + curMod + " depends on module " + repo + ':' + module_id + '(' + version + ') which is different version from already loaded: ' + module.version);
                 }
                 module.depends.push(possibleModule);
@@ -1134,8 +1174,8 @@ Prepairing provider files...
     }
 
     function loadModule(module, scripts) {
-        for (var i = 0; module.depends && i < module.depends.length; ++i) {
-            var m = module.depends[i];
+        for (let i = 0; module.depends && i < module.depends.length; ++i) {
+            let m = module.depends[i];
             if (m.isLoaded)
                 continue;
 
@@ -1144,18 +1184,18 @@ Prepairing provider files...
 
         if (!module.isLoaded) {
             module.isLoaded = true;
-            for (var j = 0; module.files && j < module.files.length; ++j) {
-                var f = module.files[j];
-                var url = getModuleFileUrl(module, f);
-                scripts.push(url);
+            for (let j = 0; module.files && j < module.files.length; ++j) {
+                let f = module.files[j];
+                let url = getModuleFileUrl(module, f);
+                scripts.push('http://localhost:' + url[0] + '/' + url[1]);
             }
         }
     }
 
-    var g_modules = {};
+    let g_modules = {};
 
     function loadProviderFiles(onComplete) {
-        var module = g_modules[':'] = {};
+        let module = g_modules[':'] = {};
 
         loadFileFromRepository(null, 'anybalance-manifest.xml', function (ok, data) {
             if (!ok) {
@@ -1169,14 +1209,14 @@ Prepairing provider files...
                 if (!ok)
                     AnyBalanceDebuggerApi.trace("ERROR!!! The following modules failed to load: " + failedKeys.join(', '));
 
-                var scripts = [];
+                let scripts = [];
                 loadModule(module, scripts);
 
                 //console.log(scripts);
 
                 $('#loading_text').text('Loading provider scripts...');
-                var failedScripts = [];
-                var scriptErrorsHandled = {};
+                let failedScripts = [];
+                let scriptErrorsHandled = {};
                 $LAB.setOptions({
                     AlwaysPreserveOrder: true,
                     LoadErrorHandler: function (script, event) {
@@ -1187,7 +1227,7 @@ Prepairing provider files...
                         scriptErrorsHandled[script] = true;
                     }
                 }).script(scripts).wait(function () {
-                    onComplete(failedScripts.length == 0, failedScripts);
+                    onComplete(failedScripts.length === 0, failedScripts);
                 });
             });
         });
@@ -1197,10 +1237,10 @@ Prepairing provider files...
 
     window.addEventListener("message", function(event) {
         // We only accept messages from ourselves
-        if (event.source != window)
+        if (event.source !== window)
             return;
 
-        if (event.data.type && (event.data.type == "SCRIPT_ERROR_DETECTED")) {
+        if (event.data.type && (event.data.type === "SCRIPT_ERROR_DETECTED")) {
             AnyBalanceDebuggerApi.trace("WARNING: " + event.data.errorMsg + " at " + event.data.url + ':' + event.data.lineNumber + ". Check console for details.");
         }
     });
