@@ -347,12 +347,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     },
     // filters
     {
-        urls: [
-            "*://*/*"
-        ]//,
+        urls: ["<all_urls>"],
+//        types: "main_frame sub_frame stylesheet script image font object xmlhttprequest other".split(" ")
     },
     // extraInfoSpec
-    ["blocking", "requestHeaders"]
+    ["blocking", "requestHeaders", "extraHeaders"]
 );
 
 chrome.extension.onMessage.addListener(
