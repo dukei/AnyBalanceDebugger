@@ -899,7 +899,7 @@ Prepairing provider files...
                             }).then(text => {
                                 if(!text){
                                     $('#loading_status').html('ERROR: You should run chrome with special command line to use this extension!');
-                                    AnyBalanceDebuggerApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --force-empty-corb-allowlist --enable-features=NetworkService . Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
+                                    AnyBalanceDebuggerApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --disable-features=BypassCorbOnlyForExtensionsAllowlist --enable-features=NetworkService . Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
                                 }else{
                                     $('#buttonExecute').prop('disabled', false);
                                     $('#loading_status').hide();

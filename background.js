@@ -40,7 +40,7 @@ function ABDBackend(tabId) {
 
     function onCookieSet(cookie) {
         if (cookie == null) {
-            m_opResult = {error: chrome.runtime.lastError || 'Unknown error setting cookie!'};
+            m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error setting cookie!'};
         } else {
             m_opResult = {result: true}
         }
@@ -48,7 +48,7 @@ function ABDBackend(tabId) {
 
     function onCookieRemoved(info) {
         if (info == null) {
-            m_opResult = {error: chrome.runtime.lastError || 'Unknown error removing cookie!'};
+            m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error removing cookie!'};
         } else {
             m_opResult = {result: true}
         }
@@ -68,13 +68,13 @@ function ABDBackend(tabId) {
         getCurrentCookieStoreId(function(csid){
             if (val === null || val === undefined || val === '') {
                 chrome.cookies.remove({
-                    url: 'https://' + domain + path, //Путь надо правильный указать, иначе не удаляется
+                    url: 'https://' + domain.replace(/^\./,'') + path, //Путь надо правильный указать, иначе не удаляется
                     name: name,
                     storeId: csid
                 }, onCookieRemoved);
             } else {
                 chrome.cookies.set({
-                    url: 'https://' + domain + path,
+                    url: 'https://' + domain.replace(/^\./,'') + path,
                     name: name,
                     value: val,
                     domain: params.domain || domain,
