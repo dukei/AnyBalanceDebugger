@@ -332,6 +332,8 @@ let AnyBalanceDebuggerApi;
                 let local_options = options.options ? joinOptionsToNew(m_options, options.options) : m_options;
 
                 let domain = /:\/\/([^\/]+)/.exec(url);
+                if(domain)
+                    domain = domain[1];
                 if (!domain)
                     throw {name: "Wrong url", message: "Malformed url for request: " + url};
 
@@ -899,7 +901,7 @@ Prepairing provider files...
                             }).then(text => {
                                 if(!text){
                                     $('#loading_status').html('ERROR: You should run chrome with special command line to use this extension!');
-                                    AnyBalanceDebuggerApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --disable-features=BypassCorbOnlyForExtensionsAllowlist --enable-features=NetworkService . Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
+                                    AnyBalanceDebuggerApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --disable-features=BypassCorbOnlyForExtensionsAllowlist --enable-features=NetworkService . If you have launched Chrome with these flags and still get this message then close ALL processes of Chrome and try once more. Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
                                 }else{
                                     $('#buttonExecute').prop('disabled', false);
                                     $('#loading_status').hide();
