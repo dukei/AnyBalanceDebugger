@@ -38,23 +38,7 @@ function ABDBackend(tabId) {
         return m_tabId;
     }
 
-    function onCookieSet(cookie) {
-        if (cookie == null) {
-            m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error setting cookie!'};
-        } else {
-            m_opResult = {result: true}
-        }
-    }
-
-    function onCookieRemoved(info) {
-        if (info == null) {
-            m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error removing cookie!'};
-        } else {
-            m_opResult = {result: true}
-        }
-    }
-
-    function setCookie(domain, name, val, params) {
+    async function setCookie(domain, name, val, params) {
         m_opResult = undefined;
 
         if (!params)
@@ -65,7 +49,27 @@ function ABDBackend(tabId) {
         if (!/^\//.test(path))
             path = '/' + path;
 
-        getCurrentCookieStoreId(function(csid){
+        let csid = await getCurrentCookieStoreId();
+
+        return new Promise((resolve, reject) => {
+            function onCookieSet(cookie) {
+                if (cookie == null) {
+                    m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error setting cookie!'};
+                } else {
+                    m_opResult = {result: true}
+                }
+                resolve(m_opResult);
+            }
+
+            function onCookieRemoved(info) {
+                if (info == null) {
+                    m_opResult = {error: (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error removing cookie!'};
+                } else {
+                    m_opResult = {result: true}
+                }
+                resolve(m_opResult);
+            }
+
             if (val === null || val === undefined || val === '') {
                 chrome.cookies.remove({
                     url: 'https://' + domain.replace(/^\./,'') + path, //Путь надо правильный указать, иначе не удаляется
@@ -87,75 +91,91 @@ function ABDBackend(tabId) {
         });
     }
 
-    function getCookies() {
-        m_opResult = undefined;
-        getCurrentCookieStoreId(function (csid) {
-        	chrome.cookies.getAll({storeId: csid}, onCookiesGetAll);
+    async function executeScript(script){
+        let promise = new Promise((resolve, reject) => {
+            chrome.tabs.executeScript(getTabId(), {code: script}, (arr) => {
+                resolve(arr);
+            });
         });
+        return {result: await promise};
     }
 
-    function onCookiesGetAll(cookies) {
-        var mycookies = [];
-        for (var i = 0; i < cookies.length; ++i) {
-            var cookie = cookies[i];
-            var mycookie = {
-                name: cookie.name,
-                value: cookie.value,
-                domain: cookie.domain,
-                path: cookie.path,
-                expires: cookie.expirationDate && (new Date(cookie.expirationDate * 1000).toGMTString()),
-                persistent: !cookie.session
-            };
-            mycookies.push(mycookie);
-        }
-        m_opResult = {result: mycookies};
-    }
-
-    function onCookiesGetAllForCleaning(cookies) {
-        var cookiesToRemove = {};
-
-        function checkAllCookiesCleared(){
-            for(var id in cookiesToRemove){
-                if(!cookiesToRemove[id])
-                    return;
+    async function getCookies() {
+        m_opResult = undefined;
+        return new Promise(async (resolve, reject) => {
+            function onCookiesGetAll(cookies) {
+                var mycookies = [];
+                for (var i = 0; i < cookies.length; ++i) {
+                    var cookie = cookies[i];
+                    var mycookie = {
+                        name: cookie.name,
+                        value: cookie.value,
+                        domain: cookie.domain,
+                        path: cookie.path,
+                        expires: cookie.expirationDate && (new Date(cookie.expirationDate * 1000).toGMTString()),
+                        persistent: !cookie.session
+                    };
+                    mycookies.push(mycookie);
+                }
+                m_opResult = {result: mycookies};
+                resolve(m_opResult);
             }
-            m_opResult = {result: cookies.length};
-        }
 
-        for (var i = 0; i < cookies.length; ++i) {
-            var cookie = cookies[i];
-            var id = 'c' + i;
-            cookiesToRemove[id] = false;
-            var url = "http" + (cookie.secure ? "s" : "") + "://" + cookie.domain + cookie.path;
-
-            (function(cookie, id){
-                chrome.cookies.remove({url: url, name: cookie.name, storeId: cookie.storeId}, function(details){
-                    cookiesToRemove[id] = true;
-                    checkAllCookiesCleared();
-                });
-            })(cookie, id);
-        }
-
-        checkAllCookiesCleared();
-    }
-
-    function getCurrentCookieStoreId(callback){
-        chrome.cookies.getAllCookieStores(function(css){
-        	for(let cs of css){
-        		if(cs.tabIds.indexOf(m_tabId) >= 0){
-        			callback(cs.id);
-        			return;
-        		}
-        	}
-        	callback();		
+            let csid = await getCurrentCookieStoreId();
+            chrome.cookies.getAll({storeId: csid}, onCookiesGetAll);
         });
     }
 
-    function clearAllCookies(){
+    async function getCurrentCookieStoreId(){
+        return new Promise((resolve, reject) => {
+            chrome.cookies.getAllCookieStores(function(css){
+                for(let cs of css){
+                    if(cs.tabIds.indexOf(m_tabId) >= 0){
+                        resolve(cs.id);
+                        return;
+                    }
+                }
+                reject(new Error("Can not find cookie store id for tab: " + m_tabId));
+            });
+        });
+    }
+
+    async function clearAllCookies(){
         m_opResult = undefined;
-        getCurrentCookieStoreId(function (csid) {
-        	console.log('Cleaning cookies for store ' + csid);
-        	chrome.cookies.getAll({storeId: csid}, onCookiesGetAllForCleaning);
+        return new Promise(async (resolve, reject) => {
+            function onCookiesGetAllForCleaning(cookies) {
+                let cookiesToRemove = {};
+
+                function checkAllCookiesCleared(){
+                    for(let id in cookiesToRemove){
+                        if(!cookiesToRemove[id])
+                            return;
+                    }
+                    m_opResult = {result: cookies.length};
+                    resolve(m_opResult);
+                }
+
+                for (let i = 0; i < cookies.length; ++i) {
+                    let cookie = cookies[i];
+                    let id = 'c' + i;
+                    cookiesToRemove[id] = false;
+                    let url = "http" + (cookie.secure ? "s" : "") + "://" + cookie.domain + cookie.path;
+
+                    (function(cookie, id){
+                        chrome.cookies.remove({url: url, name: cookie.name, storeId: cookie.storeId}, function(details){
+                            cookiesToRemove[id] = true;
+                            checkAllCookiesCleared();
+                        });
+                    })(cookie, id);
+                }
+
+                checkAllCookiesCleared();
+            }
+
+            let csid = await getCurrentCookieStoreId();
+
+            console.log('Cleaning cookies for store ' + csid);
+            chrome.cookies.getAll({storeId: csid}, onCookiesGetAllForCleaning);
         });
     }
 
@@ -175,36 +195,41 @@ function ABDBackend(tabId) {
         }catch(e){
             m_opResult = {error: e.message || "Error requesting localhost:" + port + '/' + path};
         }
+        return m_opResult;
     }
 
     return {
         getTabId: getTabId,
 
-        initialize: function (config) {
+        rpcMethod_initialize: function (config) {
             m_config = config;
-            return getTabId();
+            return {result: getTabId()};
         },
 
         setLastUrl: function (url) {
             m_lastUrl = url;
         },
 
-        getLastUrl: function (url) {
-            return m_lastUrl;
+        rpcMethod_sync_getLastUrl: function (url) {
+            return {result: m_lastUrl};
         },
 
-        getCookies: getCookies,
-        setCookie: setCookie,
-        getOpResult: getOpResult,
+        rpcMethod_getCookies: getCookies,
+        rpcMethod_sync_getCookies: getCookies,
+        rpcMethod_setCookie: setCookie,
+        rpcMethod_sync_setCookie: setCookie,
+        rpcMethod_sync_getOpResult: getOpResult,
 
         dummy: function () {
             console.log('dummy');
         },
 
-        clearAllCookies: clearAllCookies,
+        rpcMethod_clearAllCookies: clearAllCookies,
+        rpcMethod_sync_clearAllCookies: clearAllCookies,
 
-        requestLocalhost: requestLocalhost,
-        requestLocalhostSync: requestLocalhostSync,
+        rpcMethod_requestLocalhost: requestLocalhostSync,
+        rpcMethod_sync_requestLocalhost: requestLocalhostSync,
+        rpcMethod_executeScript: executeScript,
     };
 };
 
@@ -367,8 +392,8 @@ chrome.extension.onMessage.addListener(
                 if(!backend)
                     backend = abd_getBackend(sender.tab.id, true);
 
-                let result = await backend[request.method].apply(backend, request.params);
-                sendResponse({result: result});
+                let result = await backend['rpcMethod_' + request.method].apply(backend, request.params);
+                sendResponse(result);
             }catch(e){
                 sendResponse({error: e});
             }
@@ -391,8 +416,8 @@ chrome.webRequest.onHeadersReceived.addListener(
         if (data.type == 'service') {
             //Служебный запрос для синхронного запроса бэкграунда
             var backend = abd_getBackend(info.tabId);
-            var result = backend[data.data.method].apply(backend, data.data.params);
-            return {responseHeaders: [{name: 'ab-data', value: JSON.stringify({result: result})}]};
+            var result = backend['rpcMethod_sync_' + data.data.method].apply(backend, data.data.params);
+            return {responseHeaders: [{name: 'ab-data', value: JSON.stringify(result)}]};
         } else if (data.type == 'user') {
             //Ответ на запрос данных от провайдера
             //Похимичим с кодировкой ответа
