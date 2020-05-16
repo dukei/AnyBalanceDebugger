@@ -32,6 +32,70 @@ class AsyBalanceSystemError extends Error {
         this.name = 'AnyBalanceApiError';
     }
 }
+class AsyResponseObject {
+    constructor(data) {
+        this.data = data;
+    }
+    getString() {
+        const body = this.data.body;
+        let rets;
+        if (typeof body === 'string') {
+            rets = body;
+        }
+        else if (body instanceof ArrayBuffer) {
+            rets = base64_arraybuffer_1.encode(body);
+        }
+        else {
+            throw new AsyBalanceSystemError(`Unknown type of response from ${this.url}`);
+        }
+        return rets;
+    }
+    getBuffer() {
+        const body = this.data.body;
+        let retb;
+        if (typeof body === 'string') {
+            retb = base64_arraybuffer_1.decode(body);
+        }
+        else if (body instanceof ArrayBuffer) {
+            retb = body;
+        }
+        else {
+            throw new AsyBalanceSystemError(`Unknown type of response from ${this.url}`);
+        }
+        return retb;
+    }
+    getLastStatusString(response) {
+        return this.data.status;
+    }
+    getLastStatusCode(response) {
+        const matches = this.data.status.match(/\S+\s+(\d+)/);
+        if (!matches)
+            return 0;
+        return parseInt(matches[1]);
+    }
+    /**
+     * Get value of the first header with the specified name
+     * @param name
+     */
+    getLastResponseHeader(resp, name) {
+        var headers = this.data.headers;
+        name = name.toLowerCase();
+        for (let i = 0; i < headers.length; ++i) {
+            const header = headers[i];
+            if (header[0].toLowerCase() == name)
+                return header[1];
+        }
+        return false;
+    }
+    getLastResponseHeaders(response) {
+        return this.data.headers;
+    }
+    get headers() { return this.data.headers; }
+    get url() { return this.data.url; }
+    get status() { return this.data.status; }
+    get body() { return this.data.body; }
+    ;
+}
 class AsyBalance {
     constructor(params) {
         this.setResultCalled = false;
@@ -59,7 +123,7 @@ class AsyBalance {
             }
         }
         else {
-            throw new AsyBalanceSystemError("Empty output from method: " + name);
+            throw new AsyBalanceSystemError("Unexpected output from method '" + name + "': (" + (typeof ret) + ") " + JSON.stringify(ret).substr(0, 128));
         }
     }
     async api_getLevel() {
@@ -143,7 +207,7 @@ class AsyBalance {
             }
             payload = await this.callAnyBalance(method, [url, data, json, headers, options]);
         }
-        return payload;
+        return new AsyResponseObject(payload);
     }
     async api_setAuthentication(name, pass, authscope) {
         const method = 'setAuthentication';
@@ -422,19 +486,6 @@ class AsyBalance {
         return this.requestPost(url, null, headers, options);
     }
     /**
-     * Sends get request
-     * @param url
-     * @param headers
-     * @param options
-     */
-    async requestGetBuffer(url, headers, options) {
-        if (!options)
-            options = {};
-        if (!options.httpMethod)
-            options.httpMethod = api_1.HTTP_METHOD.GET;
-        return this.requestPostBuffer(url, null, headers, options);
-    }
-    /**
      * Sends post request
      * @param url
      * @param data
@@ -443,44 +494,7 @@ class AsyBalance {
      */
     async requestPost(url, data, headers, options) {
         const response = await this.api_requestPost(url, data || null, headers || null, options || null);
-        let rets;
-        if (typeof response.body === 'string') {
-            rets = new String(response.body);
-        }
-        else if (response.body instanceof ArrayBuffer) {
-            rets = new String(base64_arraybuffer_1.encode(response.body));
-        }
-        else {
-            rets = new String();
-        }
-        let ret = rets;
-        ret.params = response;
-        return ret;
-    }
-    /**
-     * Sends post request
-     * @param url
-     * @param data
-     * @param headers
-     * @param options
-     */
-    async requestPostBuffer(url, data, headers, options = {}) {
-        if (!options.forceCharset)
-            options.forceCharset = 'binary';
-        const response = await this.api_requestPost(url, data || null, headers || null, options);
-        let rets;
-        if (typeof response.body === 'string') {
-            rets = base64_arraybuffer_1.decode(response.body);
-        }
-        else if (response.body instanceof ArrayBuffer) {
-            rets = response.body;
-        }
-        else {
-            rets = new ArrayBuffer(0);
-        }
-        let ret = rets;
-        ret.params = response;
-        return ret;
+        return response;
     }
     /**
      * Set authentication parameters for this session
@@ -497,49 +511,6 @@ class AsyBalance {
      */
     async getCookies() {
         return this.getCookiesImpl();
-    }
-    /**
-     * 	Get the last response url taking redirections into account
-     */
-    getLastUrl(resp) {
-        const info = resp.params;
-        return info.url;
-    }
-    /**
-     * Get the last response status string
-     */
-    getLastStatusString(resp) {
-        return resp.params.status;
-    }
-    /**
-     * Get the last response integer status code
-     */
-    getLastStatusCode(resp) {
-        const info = resp.params;
-        const matches = info.status.match(/\S+\s+(\d+)/);
-        if (!matches)
-            return 0;
-        return parseInt(matches[1]);
-    }
-    /**
-     * Get the array of last response headers [[name, value], ...]
-     */
-    getLastResponseHeaders(resp) {
-        return resp.params.headers;
-    }
-    /**
-     * Get value of the first header with the specified name
-     * @param name
-     */
-    getLastResponseHeader(resp, name) {
-        var headers = resp.params.headers;
-        name = name.toLowerCase();
-        for (let i = 0; i < headers.length; ++i) {
-            const header = headers[i];
-            if (header[0].toLowerCase() == name)
-                return header[1];
-        }
-        return false;
     }
     /**
      * Get cookie value by name

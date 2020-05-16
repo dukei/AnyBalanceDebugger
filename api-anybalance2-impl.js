@@ -1,6 +1,8 @@
 class AnyBalanceDebuggerApi2{
     global_config;
     m_credentials = {};
+    m_options = {};
+    request_id = 0;
 
     constructor(global_config){
         this.global_config = global_config;
@@ -11,7 +13,7 @@ class AnyBalanceDebuggerApi2{
     }
 
     addRequestHeaders(request, headers, options) {
-        if (headers)
+        if (typeof(headers) === 'string')
             headers = JSON.parse(headers);
         headers = headers || {};
         let serviceHeaders = {};
@@ -20,7 +22,7 @@ class AnyBalanceDebuggerApi2{
             let idx = abd_getHeaderIndex(headers, aname);
             if (!isset(idx)) {
                 //Авторизация требуется, значит, надо поставить и заголовок авторизации, раз он ещё не передан
-                let value = "Basic " + DebuggerCommonApi.base64EncodeUtf8(m_credentials.user + ':' + m_credentials.password);
+                let value = "Basic " + DebuggerCommonApi.base64EncodeUtf8(this.m_credentials.user + ':' + this.m_credentials.password);
                 serviceHeaders[aname] = value;
             }
         }
@@ -44,11 +46,15 @@ class AnyBalanceDebuggerApi2{
 
 
     async request(defaultMethod, url, data, json, headers, options) {
+        const request_id = ++this.request_id;
         let auth = this.getUserAndPassword(url);
         let xhr = new XMLHttpRequest();
 
-        options = options ? JSON.parse(options) : {};
-        let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(m_options, options.options) : m_options;
+        if(typeof(options) === 'string')
+            options = JSON.parse(options);
+        options = options || {};
+
+        let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(this.m_options, options.options) : this.m_options;
 
         let domain = /:\/\/([^\/]+)/.exec(url);
         if(domain)
@@ -60,7 +66,7 @@ class AnyBalanceDebuggerApi2{
         let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
         let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
 
-        api_trace(method + " to " + url + (isset(data) ? " with data: " + data : ''));
+        DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + data : ''));
         xhr.open(method, url, true, auth.user, auth.password);
 
         if (isset(data)) {
@@ -103,7 +109,7 @@ class AnyBalanceDebuggerApi2{
 
         console.log(method + " result (" + xhr.status + "): " + serverResponse.substr(0, 255));
         let id = 'shh' + new Date().getTime();
-        DebuggerCommonApi.html_output(method + " result (" + xhr.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
+        DebuggerCommonApi.html_output(method + "(id:" + request_id + ") result (" + xhr.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
         $('#' + id).on('click', function(e){return DebuggerCommonApi.toggleHtml(e, serverResponse)});
         params.body = serverResponse;
         return {payload: params}
@@ -115,7 +121,7 @@ class AnyBalanceDebuggerApi2{
             xhr.send(data);
             xhr.onload = () => {
                 // Запрос завершен. Здесь можно обрабатывать результат.
-                resolve();
+                resolve(xhr);
             };
             xhr.onerror = () => {
                 reject(new Error("Request error!"));
@@ -148,7 +154,7 @@ class AnyBalanceDebuggerApi2{
         return {payload: undefined};
     }
 
-    async rpcMethod_setCookie(domain, name, value, params) {
+    async rpcMethod_setCookie(domain, name, val, params) {
         if (val && typeof(val) !== 'string')
             throw new Error('Trying to set cookie ' + name + ' to an object: ' + JSON.stringify(val));
 
@@ -172,12 +178,12 @@ class AnyBalanceDebuggerApi2{
 
         for (let opt in options) {
             if (options[opt] == null)
-                m_options[opt] = undefined;
+                this.m_options[opt] = undefined;
             else
-                m_options[opt] = options[opt];
+                this.m_options[opt] = options[opt];
         }
 
-        return true;
+        return {payload: undefined};
 
     }
 
@@ -261,7 +267,7 @@ class AnyBalanceDebuggerApi2{
 
     async rpcMethod_loadData() {
         let data = localStorage.getItem('abd_stored_data');
-        return isset(data) && data !== null ? data : "";
+        return {payload: isset(data) && data !== null ? data : ""};
     }
 
     async rpcMethod_saveData(data) {
@@ -269,7 +275,7 @@ class AnyBalanceDebuggerApi2{
         return {payload: {}};
     }
 
-    async trace(msg, callee) {
+    async rpcMethod_trace(msg, callee) {
         await DebuggerCommonApi.trace(msg, callee);
         return Promise.resolve({payload: undefined});
     }

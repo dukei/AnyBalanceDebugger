@@ -31,36 +31,7 @@
     };
 
     const debuggerCommonApi = new DebuggerCommonApi(g_global_config);
-    let promiseCounter = 0;
-
-// add RPC communication event
-    document.addEventListener('AnyBalanceDebuggerRPC', async function (e) {
-        let hiddenDiv = document.getElementById('AnyBalanceDebuggerRPCContainer');
-        let eventData = hiddenDiv.innerText;
-        let rpc = JSON.parse(eventData);
-        try {
-            let ret = debuggerCommonApi.callRPC(rpc);
-            if (ret instanceof Promise) {
-                let pid = 'p' + (++promiseCounter);
-                hiddenDiv.innerText = JSON.stringify({promise: pid});
-                try {
-                    ret = await ret;
-                } catch (e) {
-                    console.error("Error in " + rpc.method, e);
-                    ret = {error: e};
-                }
-                await DebuggerCommonApi.callBackground({
-                    method: 'executeScript',
-                    script: `abd_resolveContentFuncResult__('${pid}', JSON.stringify(${JSON.stringify(ret)}))`
-                });
-            } else {
-                hiddenDiv.innerText = JSON.stringify({result: ret});
-            }
-        }catch(e){
-            console.error("Error calling rpc method " + rpc.method, e);
-            hiddenDiv.innerText = JSON.stringify({error: e.message});
-        }
-    });
+    const communication = new Communication(false, rpc => debuggerCommonApi.callRPC(rpc));
 
     let tabs = `
 <div id="tabs">
@@ -73,7 +44,6 @@
 </div>`;
 
     let initialContent = `<div id="initialContent">
-        <div style="display:none" id="AnyBalanceDebuggerRPCContainer"></div>
         <button>Execute</button>
         <div id="AnyBalanceDebuggerLog"></div>
     </div>`;
@@ -106,6 +76,7 @@
         $LAB.setOptions({AlwaysPreserveOrder: true})
             .script(chrome.extension.getURL('jquery-ui/jquery.min.js'))
             .script(chrome.extension.getURL('json-viewer/jquery.json-viewer.js'))
+            .script(chrome.extension.getURL('communication.js'))
             .script(chrome.extension.getURL('api-adapter.js'))
             .script(chrome.extension.getURL('api1.min.js'))
             .script(chrome.extension.getURL('api2.js'))

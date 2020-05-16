@@ -1,5 +1,7 @@
-﻿function abd_trace(msg, callee) {
-    return abd_callContentFunc({method: 'trace', params: [msg, callee]});
+﻿const communication = new Communication(true);
+
+function abd_trace(msg, callee) {
+    return communication.callRPC({method: 'trace', params: [msg, callee]});
 }
 
 function html_output(msg, callee) {
@@ -19,13 +21,13 @@ var g_AnyBalanceApiParams = {
         var signature = g_AnyBalanceDebuggerSignature;
         if (json.slice(0, signature.length) == signature) {
             let rpccallstr = json.slice(signature.length);
-            let resstr = abd_callContentFuncInner__(rpccallstr);
-            let res = JSON.parse(resstr);
-            if(res.promise) {
-                console.error("Async result from sync API!!!");
-                throw new Error("Async result from sync API!!!");
+            let rpc = JSON.parse(rpccallstr);
+            let res = communication.callRPC(rpc);
+            if(res instanceof Promise) {
+                console.error("Async result from sync API!!! " + rpc.method);
+                throw new Error("Async result from sync API!!! " + rpc.method);
             }
-            return resstr;
+            return JSON.stringify({result: res});
         } else {
             return prompt(json, defval);
         }
@@ -40,85 +42,18 @@ var g_AnyBalanceApiParams = {
     }
 };
 
-function abd_callContentFuncInner__(strcall) {
-    var customEvent = document.createEvent('Event');
-    customEvent.initEvent('AnyBalanceDebuggerRPC', true, true);
-
-    var hiddenDiv = document.getElementById('AnyBalanceDebuggerRPCContainer');
-    hiddenDiv.innerText = strcall;
-    document.dispatchEvent(customEvent);
-
-    var result = hiddenDiv.innerText;
-    if (result == strcall) {
-        var msg = 'AnyBalance debugging requires chrome extension to be installed (<a href=\'http://code.google.com/p/any-balance-providers/downloads/list?q=AnyBalanceDebugger\'>AnyBalanceDebugger</a>). Make sure you check Allow access to file URL for this extension at chrome://settings/extensions. And your local html file should be named like *-anybalance.html .';
-        alert(msg);
-        throw new Error(msg);
-    }
-
-    return result;
-}
-
-async function abd_callContentFunc__(strcall) {
-    let strresult = abd_callContentFuncInner__(strcall);
-    let res = JSON.parse(strresult);
-    if(res.promise){
-        let promises = abd_callContentFunc__.promises;
-        if(!promises)
-            promises = abd_callContentFunc__.promises = {};
-        return new Promise((resolve, reject) => {
-            let promise = promises[res.promise];
-            if(!promise) {
-                promises[res.promise] = {
-                    name: res.promise,
-                    resolve: resolve,
-                    reject: reject
-                }
-            }else if(promise.result){
-                resolve(result.result);
-                delete promises[res.promise];
-            }else{
-                throw new Error('Promise ' + res.promise + ' already exists!')
-            }
-        });
-    }
-    return res.result;
-}
-
-//Вызывается из контент скрипта
-function abd_resolveContentFuncResult__(promise_name, result){
-    let promises = abd_callContentFunc__.promises;
-    if(!promises)
-        promises = abd_callContentFunc__.promises = {};
-    let promise = promises[promise_name];
-    if(!promise) {
-        promises[promise_name] = {
-            name: promise_name,
-            result: result,
-        }
-    }else if(promise.resolve){
-        promise.resolve(result);
-        delete promises[promise_name];
-    }else{
-        throw new Error('Promise ' + promise_name + ' already has result!')
-    }
-}
-
-function abd_callContentFunc(rpccall) {
-    var strcall = JSON.stringify(rpccall);
-    return abd_callContentFunc__(strcall);
-}
-
 async function loadApiGen2(){
     $('button').prop("disabled", true);
     try {
-        await new AnyBalanceApi2({
+        window.AnyBalance = new AnyBalanceApi2({
             preferences: g_AnyBalanceApiParams.preferences,
             signature: g_AnyBalanceApiParams.signature,
             stringRPC: async (str) => {
                 const signature = g_AnyBalanceDebuggerSignature;
                 if (str.slice(0, signature.length) === signature) {
-                    var rpccallstr = str.slice(signature.length);
-                    return await abd_callContentFuncAsync__(rpccallstr);
+                    var rpccall = JSON.parse(str.slice(signature.length));
+                    let result = await communication.callRPC(rpccall);
+                    return JSON.stringify(result);
                 } else {
                     console.error("Bad RPC call signature: " + str);
                     return null;
@@ -134,23 +69,24 @@ async function loadApiGen2(){
                     return true;
                 }
             }
-        }).execute(main);
+        });
+        await AnyBalance.execute(main);
     }finally{
         $('button').prop("disabled", false);
     }
 }
 
-function abd_executeProvider(){
+async function abd_executeProvider(){
     //вызывается из контент скрипта
     var now = new Date();
     html_output(`<font color="#888">Provider (started at ${now}, api gen: ${g_AnyBalanceApiParams.apiGen})</font>`);
 
     if(g_AnyBalanceApiParams.apiGen == 1) {
-        api_onload();
-    }else if(g_AnyBalanceApiParams == 2) {
-        loadApiGen2();
+        await api_onload();
+    }else if(g_AnyBalanceApiParams.apiGen == 2) {
+        await loadApiGen2();
     }else{
-        adb_trace("Unknown g_api_gen: " + g_AnyBalanceApiParams.apiGen);
+        abd_trace("Unknown g_api_gen: " + g_AnyBalanceApiParams.apiGen);
     }
 
     var now1 = new Date();
@@ -158,7 +94,7 @@ function abd_executeProvider(){
 }
 
 function abd_checkIsBackgroundInitialized() {
-    if (abd_callContentFunc({method: 'isBackgroundInitialized'})) {
+    if (communication.callRPC({method: 'isBackgroundInitialized'})) {
         //Бэкграунд инициализирован, можно загружать провайдер
         abd_executeProvider();
     } else {
@@ -173,7 +109,7 @@ function abd_onLoadDocument() {
 
     //ВНИМАНИЕ!!! Тут надо затереть прописанный в html хэндлер, так что делаем именно так
     $('button')[0].onclick = function () {
-        abd_callContentFunc({method: 'initializeBackground', params: [{apiGen: g_AnyBalanceApiParams.apiGen}]});
+        communication.callRPC({method: 'initializeBackground', params: [{apiGen: g_AnyBalanceApiParams.apiGen}]});
         window.setTimeout(abd_checkIsBackgroundInitialized, 100);
     };
 

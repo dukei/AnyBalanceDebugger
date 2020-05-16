@@ -180,7 +180,7 @@ function ABDBackend(tabId) {
     }
 
     function getOpResult() {
-        return m_opResult;
+        return {result: m_opResult};
     }
 
     async function requestLocalhost(port, path, params){
@@ -266,6 +266,8 @@ chrome.webRequest.onBeforeRequest.addListener(function (info) {
 
 //Отслеживание обычных запросов нашего таба
 chrome.webRequest.onBeforeRequest.addListener(function (info) {
+        console.log('Before request: ' + info.requestId, info.url);
+
         if (info.url.slice(0, c_requestBase.length) == c_requestBase)
             return; //Это служебный запрос, не трогаем его
 
@@ -405,6 +407,7 @@ chrome.extension.onMessage.addListener(
 chrome.webRequest.onHeadersReceived.addListener(
     function (info) {
         var data = g_requestData[info.requestId];
+        console.log('Response headers received: ' + info.requestId, info.responseHeaders);
 
         if (!data) {
             return; //Это явно не наш запрос
@@ -445,6 +448,18 @@ chrome.webRequest.onHeadersReceived.addListener(
             } else {
                 headers.push({name: 'Content-Type', value: 'text/plain' + newcharset});
             }
+
+            //удаляем у всех кук SameSite
+            for(let h of headers){
+                if(h.name.toLowerCase() === 'set-cookie'){
+                    const re = /\bSameSite=[^n]\w+/g;
+                    if(re.test(h.value)) {
+                        console.log('Removing SameSite (' + info.requestId + '): ' + h.name + '=' + h.value);
+                        h.value = h.value.replace(/\bSameSite=[^n]\w+/g, 'SameSite=none');
+                    }
+                }
+            }
+
             return {responseHeaders: headers};
         }
     },
@@ -455,7 +470,7 @@ chrome.webRequest.onHeadersReceived.addListener(
         ]
     },
     // extraInfoSpec
-    ["blocking", "responseHeaders"]
+    ["blocking", "responseHeaders", "extraHeaders"]
 );
 
 function onEndRequest(info) {
