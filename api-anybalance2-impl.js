@@ -1,4 +1,5 @@
 class AnyBalanceDebuggerApi2{
+    DEFAULT_CHARSET = 'utf-8';
     global_config;
     m_credentials = {};
     m_options = {};
@@ -38,9 +39,15 @@ class AnyBalanceDebuggerApi2{
     }
 
     getLastParameters(xhr) {
+        let headers = DebuggerCommonApi.parseHeaders(xhr.getAllResponseHeaders());
+        let dataHeader = headers.find(h => h[0] === 'ab-data-return');
+        let data = JSON.parse(dataHeader[1]);
+        headers = headers.filter(h => h[0] !== 'ab-data-return');
+
         return {
-            headers: xhr.getAllResponseHeaders(),
-            status: 'HTTP/1.1 ' + xhr.status + ' ' + xhr.statusText
+            headers: headers,
+            status: 'HTTP/1.1 ' + xhr.status + ' ' + xhr.statusText,
+            url: data.url
         }
     }
 
@@ -61,12 +68,14 @@ class AnyBalanceDebuggerApi2{
             domain = domain[1];
         if (!domain)
             throw {name: "Wrong url", message: "Malformed url for request: " + url};
+        if(data === null)
+            data = undefined;
 
         let method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
-        let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
+        let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || this.DEFAULT_CHARSET;
         let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
 
-        DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + data : ''));
+        DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + (typeof data === 'string' ? data : JSON.stringify(data)) : ''));
         xhr.open(method, url, true, auth.user, auth.password);
 
         if (isset(data)) {
@@ -97,7 +106,6 @@ class AnyBalanceDebuggerApi2{
         xhr = await this.xhr_send(xhr, headers, local_options, data);
 
         let params = this.getLastParameters(xhr);
-        params.url = url;
 
         let serverResponse = xhr.responseText;
 
@@ -176,15 +184,8 @@ class AnyBalanceDebuggerApi2{
         if(typeof options === 'string')
             options = JSON.parse(options);
 
-        for (let opt in options) {
-            if (options[opt] == null)
-                this.m_options[opt] = undefined;
-            else
-                this.m_options[opt] = options[opt];
-        }
-
+        DebuggerCommonApi.joinOptions(this.m_options, options);
         return {payload: undefined};
-
     }
 
     async rpcMethod_sleep(ms) {
@@ -214,7 +215,9 @@ class AnyBalanceDebuggerApi2{
             options = JSON.parse(options);
 
         if(!options || !options.type || options.type !== 'recaptcha2'){
-            $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '">').show();
+            $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '" style="max-width:100%">').show();
+
+            await this.rpcMethod_sleep(10);
 
             let dlgReturnValue = prompt(comment, "");
             $('#AnyBalanceDebuggerPopup').hide();

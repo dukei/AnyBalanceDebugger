@@ -98,7 +98,7 @@ function Communication(dirForward, processRPC) {
                     ret = await ret;
                 } catch (e) {
                     console.error("Error in rpc method " + getDirSymbol() + rpc.method, e);
-                    ret = {error: e.message};
+                    ret = {error: true, message: e.message};
                 }
 
                 callRPC({method: RESOLVE_PROMISE, params: [pid, ret]}, !dirForward);
@@ -107,7 +107,7 @@ function Communication(dirForward, processRPC) {
             }
         }catch(e){
             console.error("Error calling rpc method " + getDirSymbol() + rpc.method, e);
-            hiddenDiv.innerText = JSON.stringify({error: e.message});
+            hiddenDiv.innerText = JSON.stringify({error: true, message: e.message});
         }
     }
 

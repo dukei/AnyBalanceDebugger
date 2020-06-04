@@ -285,16 +285,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 return null;
             }
             let url = callBackground({method: 'getLastUrl'});
-            let headers = [];
-            let strHeaders = m_lastHeaders.split(/\r?\n/);
-            for (let i = 0; i < strHeaders.length; ++i) {
-                let header = strHeaders[i];
-                if (!header) continue;
-                let idx = header.indexOf(':');
-                let name = header.substr(0, idx);
-                let value = header.substr(idx + 1).replace(/^\s+/, '');
-                headers[headers.length] = [name, value];
-            }
+            let headers = DebuggerCommonApi.parseHeaders(m_lastHeaders);
             return JSON.stringify({url: url, status: m_lastStatus, headers: headers});
         },
 

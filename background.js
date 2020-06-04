@@ -460,6 +460,8 @@ chrome.webRequest.onHeadersReceived.addListener(
                 }
             }
 
+            headers.push({name: 'ab-data-return', value: JSON.stringify({url: info.url})});
+
             return {responseHeaders: headers};
         }
     },

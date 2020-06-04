@@ -117,8 +117,16 @@ class DebuggerCommonApi{
             let val = optionNew[option];
             if (val === null) {
                 delete optionBase[option];
-            } else if (!isset(optionBase[option]) || !isObject(val)) {
-                optionBase[option] = val;
+            } else if (!isset(optionBase[option]) || !isObject(val)){
+                if(!isObject(val)) {
+                    optionBase[option] = val;
+                }else{
+                    let v = optionBase[option];
+                    if(!isObject(v))
+                        v = {};
+                    optionBase[option] = v;
+                    DebuggerCommonApi.joinOptions(v, val);
+                }
             } else {
                 DebuggerCommonApi.joinOptions(optionBase[option], val);
             }
@@ -195,6 +203,12 @@ class DebuggerCommonApi{
             return false;
         }
 
+        function byte2Hex(N) {
+            let str = N.toString(16);
+            if (str.length < 2) str = '0' + str;
+            return str.toUpperCase();
+        }
+
         // Переопределяем функцию encodeURIComponent()
         function encodeURIComponentToWindows1251(str) {
             let ret = [];
@@ -217,13 +231,18 @@ class DebuggerCommonApi{
             return encodeURIComponent(text);
     }
 
-    static byte2Hex(N) {
-        let str = N.toString(16);
-        if (str.length < 2) str = '0' + str;
-        return str.toUpperCase();
+    static parseHeaders(strHeaders){
+        let headers = [];
+        let astrHeaders = strHeaders.split(/\r?\n/);
+        for (let i = 0; i < astrHeaders.length; ++i) {
+            let header = astrHeaders[i];
+            if (!header) continue;
+            let idx = header.indexOf(':');
+            let name = header.substr(0, idx);
+            let value = header.substr(idx + 1).replace(/^\s+/, '');
+            headers.push([name, value]);
+        }
+        return headers;
     }
-
-
-
 
 }
