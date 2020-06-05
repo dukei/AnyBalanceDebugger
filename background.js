@@ -317,15 +317,10 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         if (headers) { //Обрабатываем запросы только с таким заголовком, чтобы не вмешаться случайно в чужой запрос!
             var removable_headers = {
                 'abd-data': true,
-                'Accept': true,
-                'Accept-Charset': true,
-                'Accept-Language': true,
-                'Cache-Control': true,
-                'Connection': true,
-                'User-Agent': true,
-                'Accept-Encoding': false, //false - то есть, удаляемый только если в передаваемых хедерах он есть
-                'Content-Type': false,
-                'Cookies': false
+                'accept-encoding': false, //false - то есть, удаляемый только если в передаваемых хедерах он есть
+                'content-length': false,
+                'host': false,
+                'cookies': false
             };
 
             //console.log("onBeforeSendHeaders intercepted: " + JSON.stringify(info.url) + ', setting headers: ' + headers + ', were headers: ' + JSON.stringify(old_headers));
@@ -340,11 +335,14 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             //Уберем необязательные хедеры и те, которые переданы провайдером
             for (var i = 0; i < old_headers.length; ++i) {
                 var h = old_headers[i];
-                var newhi = abd_getHeaderIndex(headers, h.name);
+                let name = h.name.toLowerCase();
+                var newhi = abd_getHeaderIndex(headers, name);
                 if (isset(newhi))
                     continue; //Этот хедер есть у нас, значит, удаляем отсюда
-                else if (removable_headers[h.name])
+                else if (removable_headers[name] !== false)
                     continue; //Этот хедер мы не передали, но он необязательный
+                if(name === 'accept-encoding')
+                    h.value = 'gzip, deflate';
                 new_headers.push(h);
             }
 
