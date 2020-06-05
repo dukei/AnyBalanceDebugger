@@ -138,24 +138,6 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         return DebuggerCommonApi.toggleHtml(e, text);
     }
 
-    //http://stackoverflow.com/questions/985272/selecting-text-in-an-element-akin-to-highlighting-with-your-mouse
-    function SelectText(element) {
-        let doc = document
-            , text = doc.getElementById(element)
-            , range, selection;
-        if (doc.body.createTextRange) {
-            range = document.body.createTextRange();
-            range.moveToElementText(text);
-            range.select();
-        } else if (window.getSelection) {
-            selection = window.getSelection();
-            range = document.createRange();
-            range.selectNodeContents(text);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-    }
-
     function request(defaultMethod, url, data, json, headers, options) {
         let method = defaultMethod;
         try {

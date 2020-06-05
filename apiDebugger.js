@@ -163,6 +163,24 @@ class DebuggerCommonApi{
             return hljs.highlightAuto(text).value;
         }
 
+        //http://stackoverflow.com/questions/985272/selecting-text-in-an-element-akin-to-highlighting-with-your-mouse
+        function SelectText(element) {
+            let doc = document
+                , text = doc.getElementById(element)
+                , range, selection;
+            if (doc.body.createTextRange) {
+                range = document.body.createTextRange();
+                range.moveToElementText(text);
+                range.select();
+            } else if (window.getSelection) {
+                selection = window.getSelection();
+                range = document.createRange();
+                range.selectNodeContents(text);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+
         let $elem = $(e.target);
         if(!$elem.prop('initialized')){
             let id='sr' + Math.round(Math.random()*100000000);
@@ -244,5 +262,7 @@ class DebuggerCommonApi{
         }
         return headers;
     }
+
+
 
 }
