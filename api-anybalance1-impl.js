@@ -39,9 +39,9 @@ function AnyBalanceDebuggerApi1(g_global_config) {
     }
 
     function addRequestHeaders(request, headers, options) {
-        if (headers)
-            headers = JSON.parse(headers);
         headers = headers || {};
+        if (typeof headers === 'string')
+            headers = JSON.parse(headers);
         let serviceHeaders = {};
         if (m_credentials.user) {
             let aname = "Authorization";
@@ -143,6 +143,8 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         try {
             let auth = getUserAndPassword(url);
             let xhr = new XMLHttpRequest();
+            headers = headers || {};
+            if(typeof headers === 'string') headers = JSON.parse(headers);
 
             options = options ? JSON.parse(options) : {};
             let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(m_options, options.options) : m_options;
@@ -166,6 +168,12 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 if (json) {
                     let dataObj = JSON.parse(data);
                     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    if(abd_getHeaderIndex(headers, 'content-type') === undefined){
+                        if(isArray(headers))
+                            headers.push(['Content-Type', 'application/x-www-form-urlencoded']);
+                        else
+                            headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                    }
                     let _data = [];
                     if (isArray(dataObj)) {
                         for (let i = 0; i < dataObj.length; ++i) {

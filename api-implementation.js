@@ -301,7 +301,7 @@ Prepairing provider files...
                                 DebuggerCommonApi.trace("WARNING: Some dependencies were not loaded (" + failedList.join(', ') + "). Check network tab for details.");
                             }
 
-                            fetch('https://google.com').then(response => {
+                            fetch('https://www.gstatic.com/recaptcha/api2/logo_48.png').then(response => {
                                 return response.text();
                             }).then(text => {
                                 if(!text){

@@ -63,6 +63,7 @@ async function loadApiGen2(){
             apiResult: new class ResultApi {
                 async setResult(data) {
                     let ts = new Date().getTime();
+                    data = (typeof data === 'string' ? data : JSON.stringify(data));
                     await abd_trace('Plain setResult output: ' + data);
                     html_output('setResult called: <pre id="json-viewer-' + ts + '" style="margin-left:10px"></pre>');
                     $('#json-viewer-' + ts).jsonViewer(JSON.parse(data));

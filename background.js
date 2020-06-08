@@ -320,7 +320,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 'accept-encoding': false, //false - то есть, удаляемый только если в передаваемых хедерах он есть
                 'content-length': false,
                 'host': false,
-                'cookies': false
+                'cookie': false
             };
 
             //console.log("onBeforeSendHeaders intercepted: " + JSON.stringify(info.url) + ', setting headers: ' + headers + ', were headers: ' + JSON.stringify(old_headers));
@@ -458,7 +458,7 @@ chrome.webRequest.onHeadersReceived.addListener(
                 }
             }
 
-            headers.push({name: 'ab-data-return', value: JSON.stringify({url: info.url})});
+            //headers.push({name: 'ab-data-return', value: JSON.stringify({url: info.url})});
 
             return {responseHeaders: headers};
         }

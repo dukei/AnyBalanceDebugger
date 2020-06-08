@@ -1,7 +1,7 @@
 {
   "name": "AnyBalance Debugger",
   "manifest_version": 2,
-  "version": "4.0.2",
+  "version": "4.0.3",
   "description": "Provides support for AnyBalance provider debugging",
   "icons": { 
       "128": "icon.png"

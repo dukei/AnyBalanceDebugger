@@ -13,11 +13,11 @@ class AnyBalanceDebuggerApi2{
         return {user: this.m_credentials.user, password: this.m_credentials.password};
     }
 
-    addRequestHeaders(request, headers, options) {
+    getPackedHeaders(headers, options, serviceHeaders) {
         if (typeof(headers) === 'string')
             headers = JSON.parse(headers);
         headers = headers || {};
-        let serviceHeaders = {};
+        serviceHeaders = serviceHeaders || {};
         if (this.m_credentials.user) {
             let aname = "Authorization";
             let idx = abd_getHeaderIndex(headers, aname);
@@ -35,19 +35,23 @@ class AnyBalanceDebuggerApi2{
                 headers[h] = serviceHeaders[h];
         }
 
-        request.setRequestHeader('abd-data', JSON.stringify({headers: headers, options: options})); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
+        return JSON.stringify({headers: headers, options: options}); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
     }
 
-    getLastParameters(xhr) {
-        let headers = DebuggerCommonApi.parseHeaders(xhr.getAllResponseHeaders());
-        let dataHeader = headers.find(h => h[0] === 'ab-data-return');
-        let data = JSON.parse(dataHeader[1]);
-        headers = headers.filter(h => h[0] !== 'ab-data-return');
+    parseHeaders(headers){
+        let hs = [];
+        for(let h of headers.entries())
+            hs.push(h);
+        return hs;
+    }
+
+    async getLastParameters(response) {
+        let headers = this.parseHeaders(response.headers);
 
         return {
             headers: headers,
-            status: 'HTTP/1.1 ' + xhr.status + ' ' + xhr.statusText,
-            url: data.url
+            status: 'HTTP/1.1 ' + response.status + ' ' + response.statusText,
+            url: response.url
         }
     }
 
@@ -55,7 +59,6 @@ class AnyBalanceDebuggerApi2{
     async request(defaultMethod, url, data, json, headers, options) {
         const request_id = ++this.request_id;
         let auth = this.getUserAndPassword(url);
-        let xhr = new XMLHttpRequest();
 
         if(typeof(options) === 'string')
             options = JSON.parse(options);
@@ -74,19 +77,27 @@ class AnyBalanceDebuggerApi2{
         let method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
         let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || this.DEFAULT_CHARSET;
         let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
+        const redirect = abd_getOption(local_options, OPTION_MANUAL_REDIRECTS, domain);
 
         DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + (typeof data === 'string' ? data : JSON.stringify(data)) : ''));
-        xhr.open(method, url, true, auth.user, auth.password);
+        const preliminary_headers = {};
+        const serviceHeaders = {};
 
         if (isset(data)) {
             let input_charset = abd_getOption(local_options, OPTION_REQUEST_CHARSET, domain) || defCharset;
+
+            if(auth.user)
+                preliminary_headers.Authorization = 'Basic ' + btoa(auth.user + ':' + auth.password)
 
             if (json) {
                 let dataObj = data;
                 if(typeof data === 'string')
                     dataObj = JSON.parse(data);
 
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                preliminary_headers["Content-Type"] = 'application/x-www-form-urlencoded';
+                if(abd_getHeaderIndex(headers, 'content-type') === undefined)
+                    serviceHeaders["Content-Type"] = preliminary_headers["Content-Type"];
+
                 let _data = [];
                 if (isArray(dataObj)) {
                     for (let i = 0; i < dataObj.length; ++i) {
@@ -103,46 +114,36 @@ class AnyBalanceDebuggerApi2{
             }
         }
 
-        xhr = await this.xhr_send(xhr, headers, local_options, data);
+        preliminary_headers['abd-data'] = this.getPackedHeaders(headers, local_options, serviceHeaders);
+        const response = await fetch(url,{
+            method: method,
+            credentials: "include",
+            mode: "cors",
+            headers: preliminary_headers,
+            cache: "no-cache",
+            redirect: redirect ? 'manual' : 'follow',
+            body: data
+        })
 
-        let params = this.getLastParameters(xhr);
+        let params = await this.getLastParameters(response);
 
-        let serverResponse = xhr.responseText;
-
-        let responseType = xhr.getResponseHeader("Content-Type");
+        let responseType = response.headers.get("content-type");
+        let serverResponse;
         if (/image\//i.test(responseType) || charset == 'base64') {
+            let serverResponseBytes = await response.arrayBuffer();
             //Картинки преобразовываем в base64
-            serverResponse = DebuggerCommonApi.base64EncodeBytes(serverResponse);
+            serverResponse = DebuggerCommonApi.base64ArrayBuffer(serverResponseBytes);
+        }else{
+            serverResponse = await response.text();
         }
 
-        console.log(method + " result (" + xhr.status + "): " + serverResponse.substr(0, 255));
+        console.log(method + " result (" + response.status + "): " + serverResponse.substr(0, 255));
         let id = 'shh' + new Date().getTime();
-        DebuggerCommonApi.html_output(method + "(id:" + request_id + ") result (" + xhr.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
-        $('#' + id).on('click', function(e){return DebuggerCommonApi.toggleHtml(e, serverResponse)});
+        DebuggerCommonApi.html_output(method + "(id:" + request_id + ") result (" + response.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
+        $('#' + id).on('click', function(e){return DebuggerCommonApi.toggleHtml(e, serverResponse, responseType)});
         params.body = serverResponse;
         return {payload: params}
     }
-
-    async xhr_send(xhr, headers, options, data) {
-        return new Promise((resolve, reject) => {
-            this.addRequestHeaders(xhr, headers, options);
-            xhr.send(data);
-            xhr.onload = () => {
-                // Запрос завершен. Здесь можно обрабатывать результат.
-                resolve(xhr);
-            };
-            xhr.onerror = () => {
-                reject(new Error("Request error!"));
-            };
-            xhr.onabort = () => {
-                reject(new Error("Request aborted"));
-            };
-            xhr.timeout = () => {
-                reject(new Error("Request timeout"));
-            }
-        });
-    }
-
 
     async rpcMethod_requestPost(url, data, json, headers, options) {
         return this.request('POST', url, data, json, headers, options);
@@ -215,9 +216,9 @@ class AnyBalanceDebuggerApi2{
             options = JSON.parse(options);
 
         if(!options || !options.type || options.type !== 'recaptcha2'){
-            $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<p><img src="data:image/png;base64,' + image + '" style="max-width:100%">').show();
+            $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<br><small>' + JSON.stringify(options) + '</small><p><img src="data:image/png;base64,' + image + '" style="max-width:100%">').show();
 
-            await this.rpcMethod_sleep(10);
+            await this.rpcMethod_sleep(300);
 
             let dlgReturnValue = prompt(comment, "");
             $('#AnyBalanceDebuggerPopup').hide();

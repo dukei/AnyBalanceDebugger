@@ -42,6 +42,7 @@ var OPTION_DEFAULT_CHARSET = "defaultCharset", //String
     OPTION_REQUEST_CHARSET = "requestCharset", //String
     OPTION_SSL_ENABLED_PROTOCOLS = "sslEnabledProtocols", //[string, string,...]
     DEFAULT_CHARSET = "windows-1251",
+	OPTION_MANUAL_REDIRECTS = "manualRedirects",
     OPTION_HTTP_METHOD = "httpMethod";
 
 function abd_getOption(options, option, domain){
