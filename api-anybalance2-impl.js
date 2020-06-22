@@ -195,7 +195,24 @@ class AnyBalanceDebuggerApi2{
         });
     }
 
-    async rpcMethod_retrieveCode(comment, image, options) {
+    static lastRetrieveCodePromise = null;
+    async rpcMethod_retrieveCode(options) {
+        while(AnyBalanceDebuggerApi2.lastRetrieveCodePromise) {
+            try {
+                await AnyBalanceDebuggerApi2.lastRetrieveCodePromise;
+            }catch(e){
+                console.error("Waiting previous retrieve", e);
+            }
+        }
+        try {
+            AnyBalanceDebuggerApi2.lastRetrieveCodePromise = this.local_retrieveCode(options);
+            return await AnyBalanceDebuggerApi2.lastRetrieveCodePromise;
+        }finally {
+            AnyBalanceDebuggerApi2.lastRetrieveCodePromise = null;
+        }
+    }
+
+    async local_retrieveCode(options) {
         if ($('#AnyBalanceDebuggerPopup').size() === 0) {
             $('<div/>', {
                 id: 'AnyBalanceDebuggerPopup'
@@ -215,8 +232,17 @@ class AnyBalanceDebuggerApi2{
         if(typeof options === 'string')
             options = JSON.parse(options);
 
-        if(!options || !options.type || options.type !== 'recaptcha2'){
-            $('#AnyBalanceDebuggerPopup').html(comment.replace(/</g, '&lt;').replace(/&/g, '&amp;') + '<br><small>' + JSON.stringify(options) + '</small><p><img src="data:image/png;base64,' + image + '" style="max-width:100%">').show();
+        const comment = options.prompt || '<no prompt>';
+        const image = options.image;
+
+        if(!options || !options.type || options.type !== 'RECAPTCHA'){
+            let ts = +new Date();
+            let html = comment.replace(/</g, '&lt;').replace(/&/g, '&amp;');
+            if(image)
+                html += '<p><img src="data:image/png;base64,' + image + '" style="max-width:100%">';
+            html += '<br><small><pre id="json-viewer-' + ts + '" style="margin-left:10px"></pre>';
+            $('#AnyBalanceDebuggerPopup').html(html).show();
+            $('#json-viewer-' + ts).jsonViewer(options);
 
             await this.rpcMethod_sleep(300);
 
@@ -227,7 +253,7 @@ class AnyBalanceDebuggerApi2{
                 throw new Error('User has cancelled entering the code!');
 
             return {payload: dlgReturnValue};
-        }else if(options.type === 'recaptcha2'){
+        }else if(options.type === 'RECAPTCHA'){
             //Для распознавания рекапчи обращаемся на localhost:1500 к программке AnyBalance Recaptcha.
             //Должна быть установлена и запущена локально
 
@@ -262,6 +288,8 @@ class AnyBalanceDebuggerApi2{
             }while(!dataOut);
 
             return {payload: dataOut};
+        }else{
+            throw new Error('Unknown code type: ' + options.type);
         }
     }
 
