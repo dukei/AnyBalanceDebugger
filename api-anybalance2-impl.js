@@ -14,9 +14,6 @@ class AnyBalanceDebuggerApi2{
     }
 
     getPackedHeaders(headers, options, serviceHeaders) {
-        if (typeof(headers) === 'string')
-            headers = JSON.parse(headers);
-        headers = headers || {};
         serviceHeaders = serviceHeaders || {};
         if (this.m_credentials.user) {
             let aname = "Authorization";
@@ -63,6 +60,10 @@ class AnyBalanceDebuggerApi2{
         if(typeof(options) === 'string')
             options = JSON.parse(options);
         options = options || {};
+
+        if (typeof(headers) === 'string')
+            headers = JSON.parse(headers);
+        headers = headers || {};
 
         let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(this.m_options, options.options) : this.m_options;
 
@@ -259,13 +260,13 @@ class AnyBalanceDebuggerApi2{
 
             let dataOut = null;
 
-            let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhostSync', params:[
+            let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[
                     1500,
                     'recaptcha',
                     {
                         method: 'POST',
                         headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                        body: serializeUrlEncoded({
+                        body: DebuggerCommonApi.serializeUrlEncoded({
                             URL: options.url,
                             SITEKEY: options.sitekey,
                             USERAGENT: options.userAgent,
@@ -280,7 +281,7 @@ class AnyBalanceDebuggerApi2{
 
             do{
                 await this.rpcMethod_sleep(5000);
-                let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhostSync', params:[1500, 'result']});
+                let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[1500, 'result']});
                 if(data === 'TIMEOUT')
                     throw new Error("ReCaptcha timeout");
                 if(data !== 'IN_PROGRESS')
