@@ -415,9 +415,18 @@ chrome.webRequest.onHeadersReceived.addListener(
         cleanOldRequests();
 
         if (data.type == 'service') {
+            m_opResult = undefined;
             //Служебный запрос для синхронного запроса бэкграунда
             var backend = abd_getBackend(info.tabId);
-            var result = backend['rpcMethod_sync_' + data.data.method].apply(backend, data.data.params);
+            var method = backend['rpcMethod_sync_' + data.data.method];
+            if(!method) {
+                var error = 'Sync method ' + data.data.method + ' not found!';
+                console.error(error);
+                m_opResult = {error: error};
+                return {responseHeaders: [{name: 'ab-data', value: JSON.stringify(m_opResult)}]};
+            }
+
+            var result = method.apply(backend, data.data.params);
             return {responseHeaders: [{name: 'ab-data', value: JSON.stringify(result)}]};
         } else if (data.type == 'user') {
             //Ответ на запрос данных от провайдера
@@ -450,10 +459,10 @@ chrome.webRequest.onHeadersReceived.addListener(
             //удаляем у всех кук SameSite
             for(let h of headers){
                 if(h.name.toLowerCase() === 'set-cookie'){
-                    const re = /\bSameSite=[^n]\w+/g;
+                    const re = /\bsamesite=[^nN]\w+/ig;
                     if(re.test(h.value)) {
                         console.log('Removing SameSite (' + info.requestId + '): ' + h.name + '=' + h.value);
-                        h.value = h.value.replace(/\bSameSite=[^n]\w+/g, 'SameSite=none');
+                        h.value = h.value.replace(/\bsamesite=[^nN]\w+/ig, 'samesite=none');
                     }
                 }
             }

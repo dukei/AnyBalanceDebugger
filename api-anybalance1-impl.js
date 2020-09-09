@@ -82,7 +82,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
 
         json = JSON.parse(data);
         if(json.error)
-            throw json.error;
+            throw new Error(json.error);
 
         return json.result;
     }
@@ -354,7 +354,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
 
                     let dataOut = null;
 
-                    callBackground({method: 'requestLocalhostSync', params:[
+                    callBackground({method: 'requestLocalhost', params:[
                             1500,
                             'recaptcha',
                             {
@@ -376,7 +376,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
 
                     do{
                         sleep(5000);
-                        callBackground({method: 'requestLocalhostSync', params:[1500, 'result']});
+                        callBackground({method: 'requestLocalhost', params:[1500, 'result']});
                         let data = wait4Result();
                         if(data === 'TIMEOUT')
                             throw {name: 'retrieveCode', message: "Captcha timeout"};
