@@ -13,7 +13,7 @@ class AnyBalanceDebuggerApi2{
         return {user: this.m_credentials.user, password: this.m_credentials.password};
     }
 
-    getPackedHeaders(headers, options, serviceHeaders) {
+    getPackedHeaders(headers, options, serviceHeaders, data) {
         serviceHeaders = serviceHeaders || {};
         if (this.m_credentials.user) {
             let aname = "Authorization";
@@ -32,7 +32,7 @@ class AnyBalanceDebuggerApi2{
                 headers[h] = serviceHeaders[h];
         }
 
-        return JSON.stringify({headers: headers, options: options}); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
+        return JSON.stringify({headers: headers, options: options, data: data}); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
     }
 
     parseHeaders(headers){
@@ -49,6 +49,18 @@ class AnyBalanceDebuggerApi2{
             headers: headers,
             status: 'HTTP/1.1 ' + response.status + ' ' + response.statusText,
             url: response.url
+        }
+    }
+
+    async getLastParametersFromBg(request_id) {
+        const info = await DebuggerCommonApi.callBackground({method: 'getRequestResults', params: [request_id]});
+        if(!info)
+            throw new Error("Requests result not found for request_id " + request_id);
+
+        return {
+            headers: info.headers.map(h => [h.name, h.value]),
+            status: info.status,
+            url: info.url
         }
     }
 
@@ -115,7 +127,7 @@ class AnyBalanceDebuggerApi2{
             }
         }
 
-        preliminary_headers['abd-data'] = this.getPackedHeaders(headers, local_options, serviceHeaders);
+        preliminary_headers['abd-data'] = this.getPackedHeaders(headers, local_options, serviceHeaders, {request_id: request_id});
         const response = await fetch(url,{
             method: method,
             credentials: "include",
@@ -126,7 +138,7 @@ class AnyBalanceDebuggerApi2{
             body: data
         })
 
-        let params = await this.getLastParameters(response);
+        let params = await this.getLastParametersFromBg(request_id);
 
         let responseType = response.headers.get("content-type");
         let serverResponse;

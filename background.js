@@ -7,6 +7,7 @@
 
 var g_abd_Backends = {};
 var g_requestData = {};
+var g_clientRequestData = {};
 var c_requestBase = "http://www.gstatic.com/inputtools/images/tia.png?abrnd";
 
 function ABDBackend(tabId) {
@@ -198,6 +199,11 @@ function ABDBackend(tabId) {
         return m_opResult;
     }
 
+    function getRequestResults(client_request_id) {
+        const data = g_clientRequestData[client_request_id];
+        return {result: data && data.results};
+    }
+
     return {
         getTabId: getTabId,
 
@@ -230,6 +236,7 @@ function ABDBackend(tabId) {
         rpcMethod_requestLocalhost: requestLocalhostSync,
         rpcMethod_sync_requestLocalhost: requestLocalhostSync,
         rpcMethod_executeScript: executeScript,
+        rpcMethod_getRequestResults: getRequestResults,
     };
 };
 
@@ -328,7 +335,19 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             headers = data.headers;
 
             //Запомним опции перекодировки и прочие
-            g_requestData[info.requestId] = {type: 'user', options: data.options, time: new Date().getTime()};
+            g_requestData[info.requestId] = {
+                type: 'user',
+                options: data.options,
+                data: data.data,
+                results: {
+                    url: '',
+                    headers: [],
+                    status: ''
+                },
+                time: new Date().getTime()
+            };
+            if(data.data && data.data.request_id)
+                g_clientRequestData[data.data.request_id] = g_requestData[info.requestId];
 
             var new_headers = [];
 
@@ -392,10 +411,16 @@ chrome.extension.onMessage.addListener(
                 if(!backend)
                     backend = abd_getBackend(sender.tab.id, true);
 
-                let result = await backend['rpcMethod_' + request.method].apply(backend, request.params);
+                const func_name = 'rpcMethod_' + request.method;
+
+                const func = backend[func_name];
+                if(!func)
+                    throw new Error("Background func not found: " + func_name);
+
+                let result = await func.apply(backend, request.params);
                 sendResponse(result);
             }catch(e){
-                sendResponse({error: e});
+                sendResponse({error: (e && e.message) || JSON.stringify(e)});
             }
         })();
         return true;
@@ -432,6 +457,12 @@ chrome.webRequest.onHeadersReceived.addListener(
             //Ответ на запрос данных от провайдера
             //Похимичим с кодировкой ответа
             var headers = info.responseHeaders;
+
+            //Сохраним данные, может, спросят
+            data.results.headers = headers;
+            data.results.url = info.url;
+            data.results.status = info.statusLine;
+
             var i = abd_getHeaderIndex(headers, 'Content-Type');
             var domain = /:\/\/([^\/]+)/.exec(info.url)[1];
             var charset = abd_getOption(data.options, OPTION_FORCE_CHARSET, domain) || abd_getOption(data.options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
@@ -491,21 +522,27 @@ function onEndRequest(info) {
 
     //Стираем информацию по этому запросу
     //console.log("onCompleted intercepted: " + info.url);
+
     delete g_requestData[info.requestId];
 }
 
 function cleanOldRequests() {
-    //Удаляем сильно давние реквесты, если таковые остались. 
-    //Они могут оставаться, если сайт кривоват и неправильно редиректит, 
+    cleanOldRequestsData(g_requestData);
+    cleanOldRequestsData(g_clientRequestData);
+}
+
+function cleanOldRequestsData(requestData) {
+    //Удаляем сильно давние реквесты, если таковые остались.
+    //Они могут оставаться, если сайт кривоват и неправильно редиректит,
     //так что не вызывается onEndRequest
     var time = new Date().getTime();
     var del = [];
-    for (var i in g_requestData) {
-        if (g_requestData[i].time < time - 1800 * 1000)
+    for (var i in requestData) {
+        if (requestData[i].time < time - 1800 * 1000)
             del.push(i);
     }
     for (var i = 0; i < del.length; ++i) {
-        delete g_requestData[i];
+        delete requestData[del[i]];
     }
 }
 
