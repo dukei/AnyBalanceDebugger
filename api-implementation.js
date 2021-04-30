@@ -286,46 +286,73 @@ Prepairing provider files...
     let g_repoServers = {},
         g_auto_port = 8900;
 
-    function configureByPreferences() {
+    async function configureByPreferences() {
         let prefs = g_global_config;
 
         $('#abd-replace-3xx').prop('checked', prefs['abd-replace-3xx']);
         $('#AnyBalanceDebuggerLog').before(animation);
 
-        DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[33649, 'server/list']})
-            .then(function (data) {
-                configureRepoServers(prefs, JSON.parse(data), function (ok, failedList) {
-                    if (ok) {
-                        let files = loadProviderFiles(function (ok, failedList) {
-                            if(!ok){
-                                DebuggerCommonApi.trace("WARNING: Some dependencies were not loaded (" + failedList.join(', ') + "). Check network tab for details.");
-                            }
+        let fenixResult, fenixError;
+        let devtoolsResult, devtoolsError;
 
-                            fetch('https://www.gstatic.com/recaptcha/api2/logo_48.png').then(response => {
-                                return response.text();
-                            }).then(text => {
-                                if(!text){
-                                    $('#loading_status').html('ERROR: You should run chrome with special command line to use this extension!');
-                                    DebuggerCommonApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --disable-features=BypassCorbOnlyForExtensionsAllowlist --enable-features=NetworkService . If you have launched Chrome with these flags and still get this message then close ALL processes of Chrome and try once more. Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
-                                }else{
-                                    $('#buttonExecute').prop('disabled', false);
-                                    $('#loading_status').hide();
-                                }
-                            });
-                        });
-                    } else {
-                        let failedRepos = [];
-                        for(let i=0; i<failedList.length; ++i){
-                            failedRepos.push(failedList[i] + ': ' + g_repoServers[failedList[i]].statusMessage);
-                        }
-                        $('#loading_status').html('ERROR: The following repositories failed:<br>&nbsp;&nbsp;&nbsp;&nbsp;' + failedRepos.join('<br>&nbsp;&nbsp;&nbsp;&nbsp;'));
+        const fenixPromise = DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[33649, 'server/list']})
+            .then(data => (console.log('Fenix is available'), fenixResult = data))
+            .catch(e => (console.log('Fenix status can not be fetched: ' + fenixError), fenixError = e.message || e));
+        const devtoolsPromise = DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[1500, 'status/version']})
+            .then(data => (console.log('devtools are available'), devtoolsResult = data))
+            .catch(e => (console.log('devtools status can not be fetched: ' + fenixError), devtoolsError = e.message || e));
+
+        await Promise.race([fenixPromise, devtoolsPromise]);
+
+        const text = await fetch('https://www.gstatic.com/recaptcha/api2/logo_48.png').then(response => response.text())
+        if(!text){
+            $('#loading_status').html('ERROR: You should run chrome with special command line to use this extension!');
+            DebuggerCommonApi.trace("Since Chrome 73 extensions are limited in cross-origin request. To lift this limitation run chrome with command-line flags: --disable-features=BypassCorbOnlyForExtensionsAllowlist --enable-features=NetworkService . If you have launched Chrome with these flags and still get this message then close ALL processes of Chrome and try once more. Check this url for details: https://www.chromium.org/Home/chromium-security/extension-content-script-fetches .");
+            return;
+        }
+
+        if(!fenixResult && !devtoolsResult){
+            await Promise.all([fenixPromise, devtoolsPromise]);
+            $('#loading_status').html('Neither <a href="https://fenixwebserver.com" target=_blank>Fenix server</a> nor <a target=_blank href="https://github.com/dukei/any-balance-devtools">any-balance-devtools</a> is unavailable. Run it or use local debugging.');
+            $('#buttonExecute').prop('disabled', false);
+            console.log(`Neither Fenix (${fenixError}) nor any-balance-devtools (${fenixError}) are available`);
+            return;
+        }
+
+        function onReposConfigured(ok, failedList) {
+            if (ok) {
+                let files = loadProviderFiles(function (ok, failedList) {
+                    if(!ok){
+                        DebuggerCommonApi.trace("WARNING: Some dependencies were not loaded (" + failedList.join(', ') + "). Check network tab for details.");
                     }
                 });
-            }).catch(function (errorThrown) {
-                $('#loading_status').html('<a href="http://fenixwebserver.com" target=_blank>Fenix server</a> is unavailable. Run it or use local debugging.');
+
                 $('#buttonExecute').prop('disabled', false);
-                console.log('Fenix status can not be fetched: ' + errorThrown);
-            });
+                $('#loading_status').hide();
+            } else {
+                let failedRepos = [];
+                for(let i=0; i<failedList.length; ++i){
+                    failedRepos.push(failedList[i] + ': ' + g_repoServers[failedList[i]].statusMessage);
+                }
+                $('#loading_status').html('ERROR: The following repositories failed:<br>&nbsp;&nbsp;&nbsp;&nbsp;' + failedRepos.join('<br>&nbsp;&nbsp;&nbsp;&nbsp;'));
+            }
+        }
+
+        if(devtoolsResult){
+            console.log('Using devtools for loading dependencies');
+            const allServers = [{
+                id: 'any-balance-devtools',
+                path: '',
+                baseUrlPath: 'file/',
+                port: 1500,
+                name: 'any-balance-devtools',
+                running: true
+            }];
+            configureRepoServers(prefs, allServers, onReposConfigured);
+        }else{
+            console.log('Using Fenix for loading dependencies');
+            configureRepoServers(prefs, JSON.parse(fenixResult), onReposConfigured);
+        }
     }
 
     function callFinalComplete(onFinalComplete, objects) {
@@ -429,7 +456,7 @@ Prepairing provider files...
                     path: r.path,
                     port: s.port,
                     name: s.name,
-                    addPath: normalizePath(r.path).substr(normalizePath(s.path).length)
+                    addPath: (s.baseUrlPath || '') + normalizePath(r.path).substr(normalizePath(s.path).length)
                 };
                 if (s.running)
                     g_repoServers[repo].status = true;
@@ -448,6 +475,8 @@ Prepairing provider files...
     }
 
     function normalizePath(path) {
+        if(path === '')
+            return path;
         return path.replace(/$/, '/').replace(/[\\\/]+/g, '/');
     }
 
@@ -455,9 +484,9 @@ Prepairing provider files...
         let lPath = normalizePath(path).toLowerCase();
 
         let maxServer = undefined;
-        let maxPathLength = 0;
+        let maxPathLength = -1;
         let maxRunningServer = undefined;
-        let maxRunningPathLength = 0;
+        let maxRunningPathLength = -1;
 
         for (let i = 0; i < curServers.length; ++i) {
             let s = curServers[i];

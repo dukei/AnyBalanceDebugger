@@ -3,6 +3,8 @@ class DebuggerCommonApi{
     global_config;
     apiAnyBalance;
 
+    static devToolsPort = 1500;
+
     constructor(global_config){
         this.global_config = global_config;
     }
@@ -32,6 +34,48 @@ class DebuggerCommonApi{
                 DebuggerCommonApi.trace('Cookies have not been cleared because it can be done in incognito mode only!');
             }
         }
+    }
+
+    static makeRecaptchaRequestParams(options, comment){
+        let sitekey = options.sitekey;
+        let type = 'v2';
+        let action = options.action;
+        let userAgent = options.userAgent;
+
+        if(sitekey.startsWith('{')){
+            const info = JSON.parse(sitekey);
+            sitekey = info.SITEKEY;
+            type = info.TYPE && info.TYPE.toLowerCase();
+            action = info.ACTION;
+            userAgent = info.USERAGENT || userAgent;
+        }
+
+        return [
+            DebuggerCommonApi.devToolsPort,
+            'captcha/recaptcha',
+            {
+                method: 'POST',
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body: DebuggerCommonApi.serializeUrlEncoded({
+                    URL: options.url,
+                    SITEKEY: sitekey,
+                    USERAGENT: userAgent,
+                    TEXT: comment,
+                    TIMELIMIT: options.time,
+                    TYPE: type,
+                    ACTION: action
+                })
+            }];
+    }
+
+    static getJsonResponse(data){
+        if(!data || !data.startsWith('{'))
+            throw new Error("Error calling devtools: " + data);
+        const resp = JSON.parse(data);
+
+        if(resp.status !== 'ok')
+            throw new Error(resp.message || data);
+        return resp;
     }
 
     isBackgroundInitialized() {

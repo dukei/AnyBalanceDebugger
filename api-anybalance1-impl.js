@@ -354,34 +354,37 @@ function AnyBalanceDebuggerApi1(g_global_config) {
 
                     let dataOut = null;
 
-                    callBackground({method: 'requestLocalhost', params:[
-                            1500,
-                            'recaptcha',
-                            {
-                                method: 'POST',
-                                headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                                body: serializeUrlEncoded({
-                                    URL: options.url,
-                                    SITEKEY: options.sitekey,
-                                    USERAGENT: options.userAgent,
-                                    TEXT: comment,
-                                    TIMELIMIT: options.time
-                                })
-                            }]
+                    callBackground({
+                        method: 'requestLocalhost',
+                        params: DebuggerCommonApi.makeRecaptchaRequestParams(options, comment)
+
                     });
                     let data = wait4Result(30000);
 
-                    if(data !== 'OK')
-                        throw {name: 'retrieveCode', message: data || m_lastError};
+                    const resp = DebuggerCommonApi.getJsonResponse(data);
 
                     do{
                         sleep(5000);
-                        callBackground({method: 'requestLocalhost', params:[1500, 'result']});
-                        let data = wait4Result();
-                        if(data === 'TIMEOUT')
-                            throw {name: 'retrieveCode', message: "Captcha timeout"};
-                        if(data !== 'IN_PROGRESS')
-                            dataOut = data; //получили ответ на капчу
+                        callBackground({method: 'requestLocalhost', params:[
+                            DebuggerCommonApi.devToolsPort,
+                            'captcha/result',
+                            {
+                                method: 'POST',
+                                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                                body: DebuggerCommonApi.serializeUrlEncoded({
+                                    handle: resp.handle
+                                })
+                            }]});
+
+                        data = wait4Result(30000);
+                        const respResult = DebuggerCommonApi.getJsonResponse(data);
+
+                        if(respResult.result === 'TIMEOUT')
+                            throw new Error("ReCaptcha timeout");
+                        if(respResult.result === 'CANCEL')
+                            throw new Error("ReCaptcha cancelled");
+                        if(respResult.result !== 'IN_PROGRESS')
+                            dataOut = respResult.result; //получили ответ на капчу
                     }while(!dataOut);
                     return dataOut;
                 }

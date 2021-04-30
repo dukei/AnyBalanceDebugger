@@ -272,32 +272,34 @@ class AnyBalanceDebuggerApi2{
 
             let dataOut = null;
 
-            let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[
-                    1500,
-                    'recaptcha',
+            const data = await DebuggerCommonApi.callBackground({
+                method: 'requestLocalhost',
+                params: DebuggerCommonApi.makeRecaptchaRequestParams(options, comment)
+            });
+
+            const resp = DebuggerCommonApi.getJsonResponse(data);
+
+            do{
+                await this.rpcMethod_sleep(5000);
+                let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[
+                    DebuggerCommonApi.devToolsPort,
+                    'captcha/result',
                     {
                         method: 'POST',
                         headers: {"Content-Type": "application/x-www-form-urlencoded"},
                         body: DebuggerCommonApi.serializeUrlEncoded({
-                            URL: options.url,
-                            SITEKEY: options.sitekey,
-                            USERAGENT: options.userAgent,
-                            TEXT: comment,
-                            TIMELIMIT: options.time
+                            handle: resp.handle
                         })
-                    }]
-            });
+                    }]});
 
-            if(data !== 'OK')
-                throw new Error(data);
+                const respResult = DebuggerCommonApi.getJsonResponse(data);
 
-            do{
-                await this.rpcMethod_sleep(5000);
-                let data = await DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[1500, 'result']});
-                if(data === 'TIMEOUT')
+                if(respResult.result === 'TIMEOUT')
                     throw new Error("ReCaptcha timeout");
-                if(data !== 'IN_PROGRESS')
-                    dataOut = data; //получили ответ на капчу
+                if(respResult.result === 'CANCEL')
+                    throw new Error("ReCaptcha cancelled");
+                if(respResult.result !== 'IN_PROGRESS')
+                    dataOut = respResult.result; //получили ответ на капчу
             }while(!dataOut);
 
             return {payload: dataOut};
