@@ -296,10 +296,10 @@ Prepairing provider files...
         let devtoolsResult, devtoolsError;
 
         const fenixPromise = DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[33649, 'server/list']})
-            .then(data => (console.log('Fenix is available'), fenixResult = data))
+            .then(data => (console.log('Fenix answered', data), fenixResult = JSON.parse(data), console.log('Fenix is available')))
             .catch(e => (console.log('Fenix status can not be fetched: ' + fenixError), fenixError = e.message || e));
         const devtoolsPromise = DebuggerCommonApi.callBackground({method: 'requestLocalhost', params:[1500, 'status/version']})
-            .then(data => (console.log('devtools are available'), devtoolsResult = data))
+            .then(data => (console.log('devtools answered', data), devtoolsResult = JSON.parse(data), console.log('devtools are available')))
             .catch(e => (console.log('devtools status can not be fetched: ' + fenixError), devtoolsError = e.message || e));
 
         await Promise.race([fenixPromise, devtoolsPromise]);
