@@ -294,7 +294,10 @@ class DebuggerCommonApi{
             return encodeURIComponent(text);
     }
 
-    static parseHeaders(strHeaders){
+    static parseHeaders(strOrArrHeaders){
+        if(Array.isArray(strOrArrHeaders))
+            return strOrArrHeaders;
+
         let headers = [];
         let astrHeaders = strHeaders.split(/\r?\n/);
         for (let i = 0; i < astrHeaders.length; ++i) {
@@ -302,7 +305,7 @@ class DebuggerCommonApi{
             if (!header) continue;
             let idx = header.indexOf(':');
             let name = header.substr(0, idx);
-            let value = header.substr(idx + 1).replace(/^\s+/, '');
+            let value = decodeURIComponent(header.substr(idx + 1).replace(/^\s+/, ''));
             headers.push([name, value]);
         }
         return headers;

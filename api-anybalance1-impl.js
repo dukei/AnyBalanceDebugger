@@ -1,5 +1,6 @@
 function AnyBalanceDebuggerApi1(g_global_config) {
     const API_LEVEL = 9;
+    let m_request_id = 0;
 
     function api_trace(msg, callee) {
         return DebuggerCommonApi.trace(msg, callee);
@@ -24,7 +25,8 @@ function AnyBalanceDebuggerApi1(g_global_config) {
     let m_credentials = {};
     let m_options = {};
     let m_lastStatus; //Последний полученный статус
-    let m_lastHeaders; //Последние полученные заголовки
+    let m_lastHeaders; //Последние полученные заголовки (строкой или массивом [name, value][])
+    let m_lastUrl; //Последний url запроса
 
     function getUserAndPassword(url) {
         return {user: m_credentials.user, password: m_credentials.password};
@@ -38,7 +40,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         return DebuggerCommonApi.base64EncodeBytes(str);
     }
 
-    function addRequestHeaders(request, headers, options) {
+    function addRequestHeaders(request, headers, options, request_id) {
         headers = headers || {};
         if (typeof headers === 'string')
             headers = JSON.parse(headers);
@@ -63,7 +65,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 headers[h] = serviceHeaders[h];
         }
 
-        request.setRequestHeader('abd-data', JSON.stringify({headers: headers, options: options})); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
+        request.setRequestHeader('abd-data', JSON.stringify({headers: headers, options: options, data: {request_id: request_id}})); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
     }
 
     function callBackground(rpccall) {
@@ -93,9 +95,11 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         return true;
     }
 
-    function saveLastParameters(xhr) {
-        m_lastStatus = 'HTTP/1.1 ' + xhr.status + ' ' + xhr.statusText;
-        m_lastHeaders = xhr.getAllResponseHeaders();
+    function saveLastParameters(request_id) {
+        const params = getLastParametersFromBg(request_id);
+        m_lastStatus = params.status;
+        m_lastHeaders = params.headers;
+        m_lastUrl = params.url;
     }
 
     function wait4Result(milliseconds) {
@@ -108,15 +112,15 @@ function AnyBalanceDebuggerApi1(g_global_config) {
             result = callBackground({method: 'getOpResult'});
         } while (!isset(result));
         if (!isset(result))
-            m_lastError = "Timeout " + milliseconds + "ms has been exeeded waiting for result";
+            m_lastError = "Timeout " + milliseconds + "ms has been exceeded waiting for result";
         else if (result.error)
             m_lastError = result.error;
         return result && result.result;
     }
 
-    function xhr_resendIfNecessary(xhr, headers, options, data) {
+    function xhr_resendIfNecessary(xhr, headers, options, data, request_id) {
         while (true) {
-            addRequestHeaders(xhr, headers, options);
+            addRequestHeaders(xhr, headers, options, request_id);
             xhr.send(data);
             if ([701, 702, 703, 707].indexOf(xhr.status) >= 0) {
                 //Запрос на редирект из фидлера
@@ -140,6 +144,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
 
     function request(defaultMethod, url, data, json, headers, options) {
         let method = defaultMethod;
+        const request_id = '1_' + (++m_request_id);
         try {
             let auth = getUserAndPassword(url);
             let xhr = new XMLHttpRequest();
@@ -190,10 +195,10 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 }
             }
 
-            xhr = xhr_resendIfNecessary(xhr, headers, local_options, data);
+            xhr = xhr_resendIfNecessary(xhr, headers, local_options, data, request_id);
             //if(!(200 <= xhr.status && xhr.status < 400))   //Necessary to get body for all codes
             //	throw {name: "HTTPError", message: "Posting " + url + " failed: status " + xhr.status};
-            saveLastParameters(xhr);
+            saveLastParameters(request_id);
             let serverResponse = xhr.responseText;
 
             let responseType = xhr.getResponseHeader("Content-Type");
@@ -213,6 +218,19 @@ function AnyBalanceDebuggerApi1(g_global_config) {
             return null;
         }
     }
+
+    function getLastParametersFromBg(request_id) {
+        const info = callBackground({method: 'getRequestResults', params: [request_id]});
+        if(!info)
+            throw new Error("Requests result not found for request_id " + request_id);
+
+        return {
+            headers: info.headers.map(h => [h.name, h.value]),
+            status: info.status,
+            url: info.url
+        }
+    }
+
 
     function serializeUrlEncoded(obj) {
         return DebuggerCommonApi.serializeUrlEncoded(obj);
@@ -274,9 +292,8 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 m_lastError = 'Previous request has not been made or it has failed';
                 return null;
             }
-            let url = callBackground({method: 'getLastUrl'});
             let headers = DebuggerCommonApi.parseHeaders(m_lastHeaders);
-            return JSON.stringify({url: url, status: m_lastStatus, headers: headers});
+            return JSON.stringify({url: m_lastUrl, status: m_lastStatus, headers: headers});
         },
 
         rpcMethod_getCapabilities: function () {

@@ -66,7 +66,7 @@ class AnyBalanceDebuggerApi2{
 
 
     async request(defaultMethod, url, data, json, headers, options) {
-        const request_id = ++this.request_id;
+        const request_id = '2_' + (++this.request_id);
         let auth = this.getUserAndPassword(url);
 
         if(typeof(options) === 'string')

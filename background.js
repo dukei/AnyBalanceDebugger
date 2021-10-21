@@ -12,7 +12,6 @@ var c_requestBase = "http://www.gstatic.com/inputtools/images/tia.png?abrnd";
 
 function ABDBackend(tabId) {
     var m_tabId = tabId;
-    var m_lastUrl;
     var m_opResult; //Результат последней асинхронной операции
     var m_config; //Глобальный конфиг дебаггера
     /*
@@ -212,14 +211,6 @@ function ABDBackend(tabId) {
             return {result: getTabId()};
         },
 
-        setLastUrl: function (url) {
-            m_lastUrl = url;
-        },
-
-        rpcMethod_sync_getLastUrl: function (url) {
-            return {result: m_lastUrl};
-        },
-
         rpcMethod_getCookies: getCookies,
         rpcMethod_sync_getCookies: getCookies,
         rpcMethod_setCookie: setCookie,
@@ -237,6 +228,7 @@ function ABDBackend(tabId) {
         rpcMethod_sync_requestLocalhost: requestLocalhostSync,
         rpcMethod_executeScript: executeScript,
         rpcMethod_getRequestResults: getRequestResults,
+        rpcMethod_sync_getRequestResults: getRequestResults,
     };
 };
 
@@ -281,8 +273,6 @@ chrome.webRequest.onBeforeRequest.addListener(function (info) {
         var backend = abd_getBackend(info.tabId);
         if (!backend)
             return; //Это не нашего таба запросы, не трогаем их
-
-        backend.setLastUrl(info.url);
     },
     // filters
     {
@@ -293,28 +283,6 @@ chrome.webRequest.onBeforeRequest.addListener(function (info) {
     // extraInfoSpec
     ["blocking"]
 );
-/*
- //Отслеживание переадресаций нашего таба
- chrome.webRequest.onBeforeRedirect.addListener(function(info) {
- if(info.url.slice(0, c_requestBase.length) == c_requestBase)
- return; //Это служебный запрос, не трогаем его
-
- var backend = abd_getBackend(info.tabId);
- if(!backend)
- return; //Это не нашего таба запросы, не трогаем их
-
- backend.setLastUrl(info.redirectUrl);
- },
- // filters
- {
- urls: [
- "*:// * /*"
- ]
- },
- // extraInfoSpec
- ["blocking"]
- );
- */
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     function (info) {
