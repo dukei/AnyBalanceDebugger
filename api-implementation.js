@@ -530,8 +530,10 @@ Prepairing provider files...
         if (!repo)
             repo = '__self';
         let r = g_repoServers[repo];
-        if(r)
+        if(r && r.path) {
             return [r.port, (r.addPath || '') + path];
+        }
+        console.error(`Path for modules repository "${repo}" is not configured. Please specify the path in AnyBalance Debugger Properties tab`);
     }
 
     function loadFileFromRepository(repo, path, onComplete) {
@@ -546,7 +548,7 @@ Prepairing provider files...
                         onComplete(false, error);
                 });
         }else{
-            onComplete(false, "Repository '" + repo + "' is not configured!");
+            onComplete(false, "Modules repository '" + repo + "' is not configured! Please specify the path in AnyBalance Debugger Properties tab");
         }
     }
 
