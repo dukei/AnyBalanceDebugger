@@ -76,6 +76,7 @@ class AnyBalanceDebuggerApi2{
         if (typeof(headers) === 'string')
             headers = JSON.parse(headers);
         headers = headers || {};
+        abd_checkHeaders(headers);
 
         let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(this.m_options, options.options) : this.m_options;
 

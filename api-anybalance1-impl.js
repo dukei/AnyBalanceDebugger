@@ -149,6 +149,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
             let auth = getUserAndPassword(url);
             let xhr = new XMLHttpRequest();
             headers = headers || {};
+            abd_checkHeaders(headers);
             if(typeof headers === 'string') headers = JSON.parse(headers);
 
             options = options ? JSON.parse(options) : {};
