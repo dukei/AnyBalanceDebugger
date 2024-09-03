@@ -198,6 +198,69 @@ function ABDBackend(tabId) {
         return m_opResult;
     }
 
+    function onCreate() {
+        //attachDebugger();
+    }
+
+    function attachDebugger(){
+        const target = {
+            tabId: getTabId()
+        };
+
+        chrome.debugger.attach(target, '1.2', () => {
+            const {lastError} = chrome.runtime;
+            if (lastError) {
+                console.warn("Error attaching debugger!", lastError);
+            }
+            else {
+                console.log("Enabling chrome debugger fetch");
+                chrome.debugger.sendCommand(target, 'Fetch.enable', {
+                    patterns: [{
+                        requestStage: 'Request'
+                    }]
+                });
+                chrome.debugger.onEvent.addListener(onDebugRequest);
+            }
+        });
+    }
+
+    async function onDebugRequest(source, method, params) {
+        if (method === 'Fetch.requestPaused') {
+            console.log("Debugger request: ", source, method, params)
+            const opts = {
+                requestId: params.requestId
+            };
+
+            const request = params.request;
+            if(request.method === 'OPTIONS' && request.headers["Access-Control-Request-Headers"] === "abd-data"){
+                opts.responseCode = 204;
+                opts.responseHeaders = [
+                    {name: 'Content-Length', value: '0'},
+                    {name: 'Access-Control-Allow-Origin', value: 'null'},
+                    {name: 'Access-Control-Allow-Credentials', value: 'true'},
+                    {name: 'Access-Control-Allow-Headers', value: 'abd-data'},
+
+                ];
+                if(request.headers["Access-Control-Request-Method"])
+                    opts.responseHeaders.push({name: 'Access-Control-Allow-Methods', value: request.headers["Access-Control-Request-Method"]})
+                opts.body = "";
+                opts.responsePhrase = "OK";
+
+                chrome.debugger.sendCommand({
+                    tabId: source.tabId
+                }, 'Fetch.fulfillRequest', opts, result => {console.log("Fulfill request result: ", result) });
+            }else {
+                chrome.debugger.sendCommand({
+                    tabId: source.tabId
+                }, 'Fetch.continueRequest', opts);
+            }
+        }
+    }
+
+    function clean() {
+        m_opResult = null;
+    }
+
     function getRequestResults(client_request_id) {
         const data = g_clientRequestData[client_request_id];
         return {result: data && data.results};
@@ -205,8 +268,10 @@ function ABDBackend(tabId) {
 
     return {
         getTabId: getTabId,
+        clean: clean,
+        onCreate: onCreate,
 
-        rpcMethod_initialize: function (config) {
+        rpcMethod_initialize: async function (config) {
             m_config = config;
             return {result: getTabId()};
         },
@@ -235,7 +300,12 @@ function ABDBackend(tabId) {
 function abd_getBackend(tabId, create) {
     var backend = g_abd_Backends[tabId];
     if (create) {
-        backend = g_abd_Backends[tabId] = ABDBackend(tabId);
+        if(backend) {
+            backend.clean();
+        }else {
+            backend = g_abd_Backends[tabId] = ABDBackend(tabId);
+            backend.onCreate();
+        }
     }
     return backend;
 }
@@ -286,8 +356,8 @@ chrome.webRequest.onBeforeRequest.addListener(function (info) {
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     function (info) {
-        var old_headers = info.requestHeaders || [];
-        var headers = abd_getHeader(old_headers, 'abd-data');
+        const old_headers = info.requestHeaders || [];
+        let headers = abd_getHeader(old_headers, 'abd-data');
 
         if (headers) { //Обрабатываем запросы только с таким заголовком, чтобы не вмешаться случайно в чужой запрос!
             var removable_headers = {
@@ -398,8 +468,17 @@ chrome.extension.onMessage.addListener(
 chrome.webRequest.onHeadersReceived.addListener(
     function (info) {
         var data = g_requestData[info.requestId];
-        console.log('Response headers received: ' + info.requestId, info.responseHeaders);
-
+        console.log('Response headers received: ', info);
+/*
+        if(info.initiator === 'null' && info.method === 'OPTIONS'){
+            info.responseHeaders.push(
+                {name: 'Access-Control-Allow-Origin', value: 'null'},
+                {name: 'Access-Control-Allow-Credentials', value: 'true'},
+                {name: 'Access-Control-Allow-Headers', value: 'abd-data'}
+            );
+            return {responseHeaders: info.responseHeaders};
+        }
+*/
         if (!data) {
             return; //Это явно не наш запрос
         }
@@ -468,6 +547,11 @@ chrome.webRequest.onHeadersReceived.addListener(
 
             //headers.push({name: 'ab-data-return', value: JSON.stringify({url: info.url})});
 
+            headers.push(
+                {name: 'Access-Control-Allow-Origin', value: 'null'},
+                {name: 'Access-Control-Allow-Credentials', value: 'true'},
+                {name: 'Access-Control-Allow-Headers', value: 'abd-data'}
+            )
             return {responseHeaders: headers};
         }
     },

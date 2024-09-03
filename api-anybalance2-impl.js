@@ -13,28 +13,6 @@ class AnyBalanceDebuggerApi2{
         return {user: this.m_credentials.user, password: this.m_credentials.password};
     }
 
-    getPackedHeaders(headers, options, serviceHeaders, data) {
-        serviceHeaders = serviceHeaders || {};
-        if (this.m_credentials.user) {
-            let aname = "Authorization";
-            let idx = abd_getHeaderIndex(headers, aname);
-            if (!isset(idx)) {
-                //Авторизация требуется, значит, надо поставить и заголовок авторизации, раз он ещё не передан
-                let value = "Basic " + DebuggerCommonApi.base64EncodeUtf8(this.m_credentials.user + ':' + this.m_credentials.password);
-                serviceHeaders[aname] = value;
-            }
-        }
-
-        for (let h in serviceHeaders) {
-            if (isArray(headers))
-                headers.push([h, serviceHeaders[h]]);
-            else
-                headers[h] = serviceHeaders[h];
-        }
-
-        return JSON.stringify({headers: headers, options: options, data: data}); //Всегда посылаем такой данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
-    }
-
     parseHeaders(headers){
         let hs = [];
         for(let h of headers.entries())
@@ -67,94 +45,20 @@ class AnyBalanceDebuggerApi2{
 
     async request(defaultMethod, url, data, json, headers, options) {
         const request_id = '2_' + (++this.request_id);
-        let auth = this.getUserAndPassword(url);
-
-        if(typeof(options) === 'string')
-            options = JSON.parse(options);
-        options = options || {};
-
-        if (typeof(headers) === 'string')
-            headers = JSON.parse(headers);
-        headers = headers || {};
-        abd_checkHeaders(headers);
-
-        let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(this.m_options, options.options) : this.m_options;
-
-        let domain = /:\/\/([^\/]+)/.exec(url);
-        if(domain)
-            domain = domain[1];
-        if (!domain)
-            throw {name: "Wrong url", message: "Malformed url for request: " + url};
-        if(data === null)
-            data = undefined;
-
-        let method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
-        let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || this.DEFAULT_CHARSET;
-        let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
-        const redirect = abd_getOption(local_options, OPTION_MANUAL_REDIRECTS, domain);
-
-        DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + (typeof data === 'string' ? data : JSON.stringify(data)) : ''));
-        const preliminary_headers = {};
-        const serviceHeaders = {};
-
-        if (isset(data)) {
-            let input_charset = abd_getOption(local_options, OPTION_REQUEST_CHARSET, domain) || defCharset;
-
-            if(auth.user)
-                preliminary_headers.Authorization = 'Basic ' + btoa(auth.user + ':' + auth.password)
-
-            if (json) {
-                let dataObj = data;
-                if(typeof data === 'string')
-                    dataObj = JSON.parse(data);
-
-                preliminary_headers["Content-Type"] = 'application/x-www-form-urlencoded';
-                if(abd_getHeaderIndex(headers, 'content-type') === undefined)
-                    serviceHeaders["Content-Type"] = preliminary_headers["Content-Type"];
-
-                let _data = [];
-                if (isArray(dataObj)) {
-                    for (let i = 0; i < dataObj.length; ++i) {
-                        _data.push(DebuggerCommonApi.encodeURIComponentToCharset(dataObj[i][0], input_charset) + '=' + DebuggerCommonApi.encodeURIComponentToCharset(dataObj[i][1], input_charset));
-                    }
-                } else {
-                    for (let key in dataObj) {
-                        _data.push(DebuggerCommonApi.encodeURIComponentToCharset(key, input_charset) + '=' + DebuggerCommonApi.encodeURIComponentToCharset(dataObj[key], input_charset));
-                    }
-                }
-                data = _data.join('&');
-            } else if (input_charset == 'base64') {
-                data = base64DecToArr(data);
-            }
-        }
-
-        preliminary_headers['abd-data'] = this.getPackedHeaders(headers, local_options, serviceHeaders, {request_id: request_id});
+        const fetchParams = DebuggerCommonApi.prepareDataForFetch(defaultMethod, url, data, json, headers, options, this.getUserAndPassword(url), request_id, this.m_options);
         const response = await fetch(url,{
-            method: method,
+            method: fetchParams.method,
             credentials: "include",
             mode: "cors",
-            headers: preliminary_headers,
-            cache: "no-cache",
-            redirect: redirect ? 'manual' : 'follow',
-            body: data
+            headers: fetchParams.headers,
+            cache: "no-store",
+            redirect: fetchParams.redirect,
+            body: fetchParams.data
         })
 
         let params = await this.getLastParametersFromBg(request_id);
-
-        let responseType = response.headers.get("content-type");
-        let serverResponse;
-        if (/image\//i.test(responseType) || charset == 'base64') {
-            let serverResponseBytes = await response.arrayBuffer();
-            //Картинки преобразовываем в base64
-            serverResponse = DebuggerCommonApi.base64ArrayBuffer(serverResponseBytes);
-        }else{
-            serverResponse = await response.text();
-        }
-
-        console.log(method + " result (" + response.status + "): " + serverResponse.substr(0, 255));
-        let id = 'shh' + new Date().getTime();
-        DebuggerCommonApi.html_output(method + "(id:" + request_id + ") result (" + response.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
-        $('#' + id).on('click', function(e){return DebuggerCommonApi.toggleHtml(e, serverResponse, responseType)});
+        const bodyBuf = await response.arrayBuffer();
+        const serverResponse = DebuggerCommonApi.decodeResponseBody(params, fetchParams, bodyBuf, request_id);
         params.body = serverResponse;
         return {payload: params}
     }

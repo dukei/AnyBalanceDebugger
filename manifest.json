@@ -1,7 +1,7 @@
 {
   "name": "AnyBalance Debugger",
   "manifest_version": 2,
-  "version": "4.2.2",
+  "version": "4.2.3",
   "description": "Provides support for AnyBalance provider debugging",
   "icons": { 
       "128": "icon.png"
@@ -12,7 +12,8 @@
     "cookies",
     "http://*/*",
     "https://*/*",
-    "storage"
+    "storage",
+    "debugger"
   ],
   "content_scripts": [
     {
@@ -36,7 +37,8 @@
 		"api-anybalance2-impl.js",
 		"apiDebugger.js",
         "communication.js",
-        "api-implementation.js"
+        "api-implementation.js",
+        "workerRequest.js"
       ],
       "css": [
         "styles.css",
@@ -51,6 +53,7 @@
     "scripts": [
       "common.js",
       "background.js"
+
     ]
   },
   "web_accessible_resources": [

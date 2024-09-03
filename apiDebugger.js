@@ -177,6 +177,120 @@ class DebuggerCommonApi{
         }
     }
 
+    static getPackedHeaders(headers, options, serviceHeaders, data, credentials, url) {
+        serviceHeaders = serviceHeaders || {};
+        if (credentials.user) {
+            let aname = "Authorization";
+            let idx = abd_getHeaderIndex(headers, aname);
+            if (!isset(idx)) {
+                //Авторизация требуется, значит, надо поставить и заголовок авторизации, раз он ещё не передан
+                let value = "Basic " + DebuggerCommonApi.base64EncodeUtf8(credentials.user + ':' + credentials.password);
+                serviceHeaders[aname] = value;
+            }
+        }
+
+        for (let h in serviceHeaders) {
+            if (isArray(headers))
+                headers.push([h, serviceHeaders[h]]);
+            else
+                headers[h] = serviceHeaders[h];
+        }
+
+        return JSON.stringify({headers: headers, options: options, data: data, url: url}); //Всегда посылаем такие данные в этом хедере, чтобы бэкграунд знал, что надо этот запрос обработать
+    }
+
+    static prepareDataForFetch(defaultMethod, url, data, json, headers, options, auth, request_id, globalOptions){
+        if(/[^\u0021-\u00ff]/.test(url))
+            throw new Error('URL contains unescaped characters: ' + url);
+
+        if(options && typeof(options) === 'string')
+            options = JSON.parse(options);
+        options = options || {};
+
+        if (headers && typeof(headers) === 'string')
+            headers = JSON.parse(headers);
+        headers = headers || {};
+        abd_checkHeaders(headers);
+
+        let local_options = options.options ? DebuggerCommonApi.joinOptionsToNew(globalOptions, options.options) : globalOptions;
+
+        let domain = /:\/\/([^\/]+)/.exec(url);
+        if(domain)
+            domain = domain[1];
+        if (!domain)
+            throw {name: "Wrong url", message: "Malformed url for request: " + url};
+        if(data === null)
+            data = undefined;
+
+        let method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
+        let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
+        let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
+        const redirect = abd_getOption(local_options, OPTION_MANUAL_REDIRECTS, domain);
+
+        DebuggerCommonApi.trace(method + "(id:" + request_id + ") to " + url + (isset(data) ? " with data: " + (typeof data === 'string' ? data : JSON.stringify(data)) : ''));
+        const preliminary_headers = {};
+        const serviceHeaders = {};
+
+        if (isset(data)) {
+            let input_charset = abd_getOption(local_options, OPTION_REQUEST_CHARSET, domain) || defCharset;
+
+            if(auth.user)
+                preliminary_headers.Authorization = 'Basic ' + btoa(auth.user + ':' + auth.password)
+
+            if (json) {
+                let dataObj = data;
+                if(typeof data === 'string')
+                    dataObj = JSON.parse(data);
+
+                preliminary_headers["Content-Type"] = 'application/x-www-form-urlencoded';
+                if(abd_getHeaderIndex(headers, 'content-type') === undefined)
+                    serviceHeaders["Content-Type"] = preliminary_headers["Content-Type"];
+
+                let _data = [];
+                if (isArray(dataObj)) {
+                    for (let i = 0; i < dataObj.length; ++i) {
+                        _data.push(DebuggerCommonApi.encodeURIComponentToCharset(dataObj[i][0], input_charset) + '=' + DebuggerCommonApi.encodeURIComponentToCharset(dataObj[i][1], input_charset));
+                    }
+                } else {
+                    for (let key in dataObj) {
+                        _data.push(DebuggerCommonApi.encodeURIComponentToCharset(key, input_charset) + '=' + DebuggerCommonApi.encodeURIComponentToCharset(dataObj[key], input_charset));
+                    }
+                }
+                data = _data.join('&');
+            } else if (input_charset == 'base64') {
+                data = base64DecToArr(data);
+            }
+        }
+
+        preliminary_headers['abd-data'] = DebuggerCommonApi.getPackedHeaders(headers, local_options, serviceHeaders, {request_id: request_id}, auth, url);
+        return {
+            method: method,
+            headers: preliminary_headers,
+            redirect: redirect ? 'manual' : 'follow',
+            outputCharset: charset,
+            body: data
+        }
+    }
+
+    static decodeResponseBody(lastParams, fetchParams, bodyBuf, request_id){
+        let responseType = abd_getHeader(lastParams.headers, "content-type");
+
+        let serverResponse;
+        if (/image\//i.test(responseType) || fetchParams.outputCharset == 'base64') {
+            let serverResponseBytes = bodyBuf;
+            //Картинки преобразовываем в base64
+            serverResponse = DebuggerCommonApi.base64ArrayBuffer(serverResponseBytes);
+        }else{
+            serverResponse = new TextDecoder(fetchParams.outputCharset).decode(bodyBuf);
+        }
+
+        console.log(fetchParams.method + " result (" + lastParams.status + "): " + serverResponse.substr(0, 255));
+        let id = 'shh' + new Date().getTime();
+        DebuggerCommonApi.html_output(fetchParams.method + "(id:" + request_id + ") result (" + lastParams.status + "): " + '<a id="' + id + '" href="#">show/hide</a><div class="expandable"></div>');
+        $('#' + id).on('click', function(e){return DebuggerCommonApi.toggleHtml(e, serverResponse, responseType)});
+        return serverResponse
+    }
+
     static joinOptionsToNew(optionBase, optionNew) {
         let o = DebuggerCommonApi.cloneObject(optionBase);
         DebuggerCommonApi.joinOptions(o, optionNew);

@@ -142,7 +142,75 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         return DebuggerCommonApi.toggleHtml(e, text);
     }
 
+    function waitForWorker(){
+        do {
+            sleep(20);
+        }while(int8[0] === 0);
+        return int8[0];
+    }
+
+    function requestExperimental(defaultMethod, url, data, json, headers, options) {
+        const request_id = '1_' + (++m_request_id);
+        const fetchParams = DebuggerCommonApi.prepareDataForFetch(defaultMethod, url, data, json, headers, options, getUserAndPassword(url), request_id, m_options);
+
+        int8[0] = 0;
+        myWorker.postMessage({
+            type: "request",
+            sab,
+            url,
+            method: fetchParams.method,
+            headers: fetchParams.headers,
+            manualRedirect: fetchParams.redirect,
+            body: fetchParams.body
+        });
+        let res = waitForWorker();
+
+        const {currentLengthOffset,
+            totalLengthOffset,
+            serviceLength} = getBufferInfo();
+
+        function decodeAndThrowError(){
+            const msgLength = getWord(int8, currentLengthOffset);
+            const msgBuf = int8.subarray(serviceLength, serviceLength + msgLength);
+            const msgBufCopy = new ArrayBuffer(msgBuf.length);
+            new Uint8Array(msgBufCopy).set(msgBuf);
+            const message = new TextDecoder().decode(msgBufCopy);
+            throw new Error(message);
+        }
+
+        const bodyBuf = new ArrayBuffer(getDWord(int8, totalLengthOffset));
+        const bodyArr = new Uint8Array(bodyBuf);
+        let curLength = 0;
+
+        do{
+            if(res === 3){
+                decodeAndThrowError();
+            }
+
+            const copiedLength = getWord(int8, currentLengthOffset);
+            bodyArr.set(int8.subarray(serviceLength, serviceLength + copiedLength), curLength);
+            curLength += copiedLength;
+
+            if(res === 1)
+                break;
+
+            int8[0] = 0;
+            myWorker.postMessage({
+                type: "response",
+                sab,
+                url,
+            });
+            res = waitForWorker();
+        }while(true);
+
+        let params = getLastParametersFromBg(request_id);
+        const serverResponse = DebuggerCommonApi.decodeResponseBody(params, fetchParams, bodyBuf, request_id);
+        return serverResponse;
+    }
+
     function request(defaultMethod, url, data, json, headers, options) {
+        if(/[^\u0021-\u00ff]/.test(url))
+            throw new Error('URL contains unescaped characters: ' + url);
         let method = defaultMethod;
         const request_id = '1_' + (++m_request_id);
         try {
@@ -164,6 +232,7 @@ function AnyBalanceDebuggerApi1(g_global_config) {
             method = options.httpMethod || abd_getOption(local_options, OPTION_HTTP_METHOD, domain) || defaultMethod;
             let defCharset = abd_getOption(local_options, OPTION_DEFAULT_CHARSET, domain) || DEFAULT_CHARSET;
             let charset = abd_getOption(local_options, OPTION_FORCE_CHARSET, domain) || defCharset;
+            const redirect = abd_getOption(local_options, OPTION_MANUAL_REDIRECTS, domain);
 
             api_trace(method + " to " + url + (isset(data) ? " with data: " + data : ''));
             xhr.open(method, url, false, auth.user, auth.password);
@@ -237,6 +306,19 @@ function AnyBalanceDebuggerApi1(g_global_config) {
         return DebuggerCommonApi.serializeUrlEncoded(obj);
     }
 
+    const sab = new SharedArrayBuffer(1024);
+    const int8 = new Uint8Array(sab);
+    const myWorker = new Worker(URL.createObjectURL(new Blob([
+        getBufferInfo.toString() +
+        getDWord.toString() +
+        setDWord.toString() +
+        setWord.toString() +
+        getWord.toString() +
+        "("+workerRequest.toString()+")()"
+    ], {type: 'text/javascript'})));
+
+    //const myWorker = new Worker(chrome.extension.getURL("workerRequest.js"));
+
     return {
         rpcMethod_getLastError: function () {
             return m_lastError;
@@ -305,7 +387,9 @@ function AnyBalanceDebuggerApi1(g_global_config) {
                 async: false,
                 persistence: true,
                 requestOptions: true,
-                requestCharset: true
+                requestCharset: true,
+                clientDebugger: true,
+                manualRedirects: false
             });
         },
 

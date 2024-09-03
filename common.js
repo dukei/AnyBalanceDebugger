@@ -67,11 +67,11 @@ function isObject(arr){
 	return Object.prototype.toString.call( arr ) === '[object Object]';
 }
 
-var OPTION_DEFAULT_CHARSET = "defaultCharset", //String
+const OPTION_DEFAULT_CHARSET = "defaultCharset", //String
     OPTION_FORCE_CHARSET = "forceCharset", //String
     OPTION_REQUEST_CHARSET = "requestCharset", //String
     OPTION_SSL_ENABLED_PROTOCOLS = "sslEnabledProtocols", //[string, string,...]
-    DEFAULT_CHARSET = "windows-1251",
+    DEFAULT_CHARSET = "utf-8",
 	OPTION_MANUAL_REDIRECTS = "manualRedirects",
     OPTION_HTTP_METHOD = "httpMethod";
 
