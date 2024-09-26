@@ -183,19 +183,18 @@ function ABDBackend(tabId) {
         return {result: m_opResult};
     }
 
-    async function requestLocalhost(port, path, params){
-        let response = await fetch('http://localhost:' + port + '/' + path, params);
-        return await response.text();
+    async function requestLocalhostSync(port, path, params){
+        m_opResult = undefined;
+        m_opResult = await requestLocalhostAsync(port, path, params);
+        return m_opResult;
     }
 
-    async function requestLocalhostSync(port, path, params){
+    async function requestLocalhostAsync(port, path, params){
         try {
-            m_opResult = undefined;
-            m_opResult = {result: await requestLocalhost(port, path, params)};
+            return {result: await (await fetch('http://localhost:' + port + '/' + path, params)).text()};
         }catch(e){
-            m_opResult = {error: e.message || "Error requesting localhost:" + port + '/' + path};
+            return {error: e.message || "Error requesting localhost:" + port + '/' + path};
         }
-        return m_opResult;
     }
 
     function onCreate() {
@@ -289,7 +288,7 @@ function ABDBackend(tabId) {
         rpcMethod_clearAllCookies: clearAllCookies,
         rpcMethod_sync_clearAllCookies: clearAllCookies,
 
-        rpcMethod_requestLocalhost: requestLocalhostSync,
+        rpcMethod_requestLocalhost: requestLocalhostAsync,
         rpcMethod_sync_requestLocalhost: requestLocalhostSync,
         rpcMethod_executeScript: executeScript,
         rpcMethod_getRequestResults: getRequestResults,
@@ -520,13 +519,13 @@ chrome.webRequest.onHeadersReceived.addListener(
                     var forcedCharset = abd_getOption(data.options, OPTION_FORCE_CHARSET, domain);
                     if (forcedCharset == 'base64')
                         forcedCharset = 'x-user-defined';
-                    newcharset = '; charset=' + (forcedCharset || 'x-user-defined');
+                    newcharset = '; charset=' + (forcedCharset || 'x-user-defined') + `; (${header ? header.value : ''})`;
                 }
                 if (header) {
                     if (!/;\s*charset\s*=\s*[\w\-]+/i.test(header.value))
                         header.value += newcharset;
                     else if (abd_getOption(data.options, OPTION_FORCE_CHARSET, domain) || /image\//i.test(header.value)) //Если у нас картинка с кодировкой, то кодировку надо сбросить!
-                        header.value = header.value.replace(/;\s*charset\s*=\s*[\w\-]+/i, newcharset);
+                        header.value = header.value.replace(/;\s*charset\s*=\s*([\w\-]+)/i, newcharset);
                 } else {
                     headers.push({name: 'Content-Type', value: 'text/plain' + newcharset});
                 }
@@ -547,11 +546,11 @@ chrome.webRequest.onHeadersReceived.addListener(
 
             //headers.push({name: 'ab-data-return', value: JSON.stringify({url: info.url})});
 
-            headers.push(
-                {name: 'Access-Control-Allow-Origin', value: 'null'},
-                {name: 'Access-Control-Allow-Credentials', value: 'true'},
-                {name: 'Access-Control-Allow-Headers', value: 'abd-data'}
-            )
+            //headers.push(
+            //    {name: 'Access-Control-Allow-Origin', value: 'null'},
+            //    {name: 'Access-Control-Allow-Credentials', value: 'true'},
+            //    {name: 'Access-Control-Allow-Headers', value: 'abd-data'}
+            //)
             return {responseHeaders: headers};
         }
     },

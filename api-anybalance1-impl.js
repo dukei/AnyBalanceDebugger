@@ -295,7 +295,19 @@ function AnyBalanceDebuggerApi1(g_global_config) {
             throw new Error("Requests result not found for request_id " + request_id);
 
         return {
-            headers: info.headers.map(h => [h.name, h.value]),
+            headers: info.headers.map(h => {
+                if(h.name.toLowerCase() === 'content-type'){
+                    const match = /x-user-defined; \((.*)\)$/.exec(h.value);
+                    if(match) {
+                        if(match[1])
+                            return [h.name, match[1]];
+                        else
+                            return null;
+                    }
+                }else {
+                    return [h.name, h.value]
+                }
+            }).filter(h => !!h),
             status: info.status,
             url: info.url
         }
