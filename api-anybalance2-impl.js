@@ -53,7 +53,7 @@ class AnyBalanceDebuggerApi2{
             headers: fetchParams.headers,
             cache: "no-store",
             redirect: fetchParams.redirect,
-            body: fetchParams.data
+            body: fetchParams.body
         })
 
         let params = await this.getLastParametersFromBg(request_id);
